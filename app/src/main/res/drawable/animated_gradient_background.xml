@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    
+    <item android:duration="4000">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="@color/gradient_mint"
+                android:centerColor="@color/gradient_aqua"
+                android:endColor="@color/gradient_purple"
+                android:angle="135"
+                android:type="linear" />
+        </shape>
+    </item>
+    
+    <item android:duration="4000">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="@color/gradient_aqua"
+                android:centerColor="@color/gradient_purple"
+                android:endColor="@color/gradient_dark_purple"
+                android:angle="225"
+                android:type="linear" />
+        </shape>
+    </item>
+    
+    <item android:duration="4000">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="@color/gradient_purple"
+                android:centerColor="@color/gradient_dark_purple"
+                android:endColor="@color/gradient_cyan"
+                android:angle="315"
+                android:type="linear" />
+        </shape>
+    </item>
+    
+    <item android:duration="4000">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="@color/gradient_dark_purple"
+                android:centerColor="@color/gradient_cyan"
+                android:endColor="@color/gradient_mint"
+                android:angle="45"
+                android:type="linear" />
+        </shape>
+    </item>
+</animation-list> 
