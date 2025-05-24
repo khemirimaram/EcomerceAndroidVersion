@@ -1,23 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".ProductDetailActivity">
+    android:layout_height="match_parent">
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:theme="@style/Theme.ECommerceApp.AppBarOverlay">
+        android:fitsSystemWindows="true">
 
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
+        <com.google.android.material.appbar.CollapsingToolbarLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:popupTheme="@style/Theme.ECommerceApp.PopupOverlay" />
+            android:layout_height="300dp"
+            android:fitsSystemWindows="true"
+            app:contentScrim="?attr/colorPrimary"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
+            <ImageView
+                android:id="@+id/productImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fitsSystemWindows="true"
+                android:scaleType="centerCrop"
+                app:layout_collapseMode="parallax" />
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_back" />
+
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -31,80 +47,166 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <ImageView
-                android:id="@+id/productImage"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:contentDescription="@string/product_image"
-                android:scaleType="centerCrop"
-                tools:src="@tools:sample/backgrounds/scenic" />
-
-            <TextView
-                android:id="@+id/tvProductTitle"
+            <!-- Titre et prix -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/productTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#212121" />
+
+                <TextView
+                    android:id="@+id/productPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#00BCD4" />
+            </LinearLayout>
+
+            <!-- Localisation et date -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:id="@+id/productLocation"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawableStart="@drawable/ic_location"
+                    android:drawablePadding="4dp"
+                    android:textColor="#757575" />
+
+                <TextView
+                    android:id="@+id/productCondition"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:drawableStart="@drawable/ic_condition"
+                    android:drawablePadding="4dp"
+                    android:textColor="#757575" />
+
+                <TextView
+                    android:id="@+id/publishDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_calendar"
+                    android:drawablePadding="4dp"
+                    android:textColor="#757575" />
+            </LinearLayout>
+
+            <!-- Séparateur -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
                 android:layout_marginTop="16dp"
-                android:textAppearance="?attr/textAppearanceHeadline6"
-                tools:text="Product Title" />
+                android:layout_marginBottom="16dp"
+                android:background="#E0E0E0" />
+
+            <!-- Description -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Description"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#212121" />
 
             <TextView
-                android:id="@+id/tvProductPrice"
+                android:id="@+id/productDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textAppearance="?attr/textAppearanceHeadline5"
-                android:textColor="?attr/colorPrimary"
-                tools:text="$99.99" />
+                android:textSize="16sp"
+                android:textColor="#757575" />
 
-            <TextView
-                android:id="@+id/productLocation"
+            <!-- Séparateur -->
+            <View
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textAppearance="?attr/textAppearanceBody2"
-                tools:text="Location" />
-
-            <TextView
-                android:id="@+id/productCondition"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textAppearance="?attr/textAppearanceBody2"
-                tools:text="Condition" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="1dp"
                 android:layout_marginTop="16dp"
-                android:text="@string/description"
-                android:textAppearance="?attr/textAppearanceSubtitle1" />
+                android:layout_marginBottom="16dp"
+                android:background="#E0E0E0" />
 
+            <!-- Informations vendeur -->
             <TextView
-                android:id="@+id/tvProductDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="Vendeur"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#212121" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
                 android:layout_marginTop="8dp"
-                android:textAppearance="?attr/textAppearanceBody1"
-                tools:text="Product description goes here..." />
+                android:gravity="center_vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAddToFavorites"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/add_to_favorites"
-                app:icon="@drawable/ic_favorite_border" />
+                <ImageView
+                    android:id="@+id/sellerAvatar"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_person"
+                    android:background="@drawable/circle_background"
+                    android:padding="12dp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnContactSeller"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/contact_seller"
-                app:icon="@drawable/ic_message" />
-
+                <TextView
+                    android:id="@+id/sellerName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:textSize="16sp"
+                    android:textColor="#212121" />
+            </LinearLayout>
         </LinearLayout>
-
     </androidx.core.widget.NestedScrollView>
+
+    <!-- Barre d'actions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@android:color/white"
+        android:elevation="8dp"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <ImageButton
+            android:id="@+id/favoriteButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_favorite_border"
+            android:contentDescription="Ajouter aux favoris" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/contactButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="Contacter le vendeur"
+            android:textAllCaps="false" />
+    </LinearLayout>
+
+    <!-- Loading indicator -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 

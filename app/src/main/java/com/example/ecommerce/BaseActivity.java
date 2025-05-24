@@ -18,7 +18,7 @@ public class BaseActivity extends AppCompatActivity {
         bottomNavigationView.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_home) {
-                startActivity(new Intent(this, HomeActivity.class));
+                startActivity(new Intent(this, MainActivity.class));
                 return true;
             } else if (itemId == R.id.navigation_favorites) {
                 // TODO: Navigate to favorites

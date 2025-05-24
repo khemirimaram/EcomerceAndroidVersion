@@ -1,27 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="product_categories">
-        <item>Autres</item>
+        <item>Sélectionnez une catégorie</item>
+        <item>Écriture</item>
+        <item>Cahiers et classeurs</item>
+        <item>Sacs et cartables</item>
+        <item>Arts plastiques</item>
         <item>Électronique</item>
-        <item>Vêtements</item>
-        <item>Maison et Jardin</item>
-        <item>Sports et Loisirs</item>
-        <item>Livres et Magazines</item>
-        <item>Jouets et Jeux</item>
-        <item>Santé et Beauté</item>
-        <item>Automobile</item>
-        <item>Bijoux et Accessoires</item>
-        <item>Instruments de Musique</item>
-        <item>Articles pour Bébés</item>
-        <item>Fournitures Scolaires</item>
+        <item>Livres scolaires</item>
+        <item>Papeterie</item>
+        <item>Autre</item>
     </string-array>
 
     <string-array name="product_conditions">
+        <item>Sélectionnez l\'état</item>
         <item>Neuf</item>
         <item>Comme neuf</item>
-        <item>Très bon état</item>
         <item>Bon état</item>
-        <item>État acceptable</item>
-        <item>À réparer</item>
+        <item>État correct</item>
+        <item>État moyen</item>
     </string-array>
 </resources> 

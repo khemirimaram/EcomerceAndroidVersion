@@ -12,6 +12,9 @@ import com.example.ecommerce.models.CartItem
 import com.google.firebase.storage.FirebaseStorage
 import android.util.Log
 import com.google.firebase.Timestamp
+import kotlinx.coroutines.tasks.await
+import java.util.UUID
+import android.content.Context
 
 /**
  * Classe de gestion centralisée des interactions avec Firebase.
@@ -19,13 +22,24 @@ import com.google.firebase.Timestamp
  * utilisée par l'application web.
  */
 object FirebaseManager {
+    private const val TAG = "FirebaseManager"
     // Instances Firebase
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance() 
     private val storage = FirebaseStorage.getInstance()
     
+    // Collections
+    private val PRODUCTS_COLLECTION = "produits"
+    private val USERS_COLLECTION = "users"
+    
     // Référence de l'utilisateur courant
-    val currentUser get() = auth.currentUser
+    var currentUser = auth.currentUser
+    var currentUserData: Map<String, Any>? = null
+    var currentProducts = mutableListOf<Product>()
+    var currentFavorites = mutableListOf<String>()
+    
+    // Référence à la collection produits
+    private val produitsCollection = db.collection("produits")
     
     // ===== AUTHENTIFICATION =====
     
@@ -110,219 +124,261 @@ object FirebaseManager {
     /**
      * Récupérer tous les produits
      */
-    fun getAllProducts(callback: (List<Product>, String?) -> Unit) {
-        db.collection("products")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { result ->
-                val products = result.documents.mapNotNull { doc ->
-                    try {
-                        val product = doc.toObject(Product::class.java)?.copy(id = doc.id)
-                        
-                        // Convertir Timestamp en Long si nécessaire
-                        val timestamp = doc.get("createdAt") as? Timestamp
-                        timestamp?.let {
-                            product?.createdAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        val updatedTimestamp = doc.get("updatedAt") as? Timestamp
-                        updatedTimestamp?.let {
-                            product?.updatedAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        product
-                    } catch (e: Exception) {
-                        Log.e("FirebaseManager", "Error converting product: ${e.message}")
-                        null
-                    }
+    suspend fun getAllProducts(): List<Product> {
+        return try {
+            val snapshot = db.collection(PRODUCTS_COLLECTION)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { document ->
+                try {
+                    document.toObject(Product::class.java)?.copy(
+                        id = document.id
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erreur lors de la conversion du document", e)
+                    null
                 }
-                callback(products, null)
             }
-            .addOnFailureListener {
-                callback(emptyList(), it.message)
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la récupération des produits", e)
+            emptyList()
+        }
     }
     
     /**
      * Récupérer les produits par catégorie
      */
-    fun getProductsByCategory(category: String, callback: (List<Product>, String?) -> Unit) {
-        db.collection("products")
-            .whereEqualTo("category", category)
-            .get()
-            .addOnSuccessListener { result ->
-                val products = result.documents.mapNotNull { doc ->
-                    try {
-                        val product = doc.toObject(Product::class.java)?.copy(id = doc.id)
-                        
-                        // Convertir Timestamp en Long si nécessaire
-                        val timestamp = doc.get("createdAt") as? Timestamp
-                        timestamp?.let {
-                            product?.createdAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        val updatedTimestamp = doc.get("updatedAt") as? Timestamp
-                        updatedTimestamp?.let {
-                            product?.updatedAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        product
-                    } catch (e: Exception) {
-                        Log.e("FirebaseManager", "Error converting product: ${e.message}")
-                        null
-                    }
-                }
-                callback(products, null)
+    suspend fun getProductsByCategory(category: String): List<Product> {
+        return try {
+            val snapshot = db.collection("produits")
+                .whereEqualTo("category", category)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { document ->
+                document.toObject(Product::class.java)?.copy(
+                    id = document.id
+                )
             }
-            .addOnFailureListener {
-                callback(emptyList(), it.message)
-            }
+        } catch (e: Exception) {
+            throw e
+        }
     }
     
     /**
-     * Récupérer un produit par ID
+     * Récupérer un produit par son ID
      */
-    fun getProductById(productId: String, callback: (Product?, String?) -> Unit) {
-        db.collection("products")
-            .document(productId)
-            .get()
-            .addOnSuccessListener { doc ->
-                if (doc.exists()) {
-                    try {
-                        val product = doc.toObject(Product::class.java)?.copy(id = doc.id)
-                        
-                        // Convertir Timestamp en Long si nécessaire
-                        val timestamp = doc.get("createdAt") as? Timestamp
-                        timestamp?.let {
-                            product?.createdAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        val updatedTimestamp = doc.get("updatedAt") as? Timestamp
-                        updatedTimestamp?.let {
-                            product?.updatedAt = it.seconds * 1000 + it.nanoseconds / 1000000
-                        }
-                        
-                        callback(product, null)
-                    } catch (e: Exception) {
-                        Log.e("FirebaseManager", "Error converting product: ${e.message}")
-                        callback(null, "Erreur lors de la conversion du produit: ${e.message}")
-                    }
-                } else {
-                    callback(null, "Produit non trouvé")
-                }
+    suspend fun getProductById(productId: String): Product? {
+        return try {
+            val document = produitsCollection.document(productId).get().await()
+            if (document.exists()) {
+                val images = document.get("images") as? List<String> ?: listOf()
+                Product(
+                    id = document.id,
+                    title = document.getString("titre") ?: "",
+                    description = document.getString("description") ?: "",
+                    price = document.getDouble("prix") ?: 0.0,
+                    images = images,
+                    category = document.getString("categorie") ?: "",
+                    condition = document.getString("etat") ?: "",
+                    location = document.getString("localisation") ?: "",
+                    sellerId = document.getString("vendeurId") ?: "",
+                    sellerName = document.getString("vendeurNom") ?: "",
+                    createdAt = document.getTimestamp("dateCreation")?.toDate()?.time 
+                        ?: System.currentTimeMillis()
+                )
+            } else {
+                null
             }
-            .addOnFailureListener {
-                callback(null, it.message)
-            }
+        } catch (e: Exception) {
+            throw e
+        }
     }
     
     /**
      * Télécharger un produit avec images
      */
-    fun uploadProduct(product: Product, images: List<Uri>, callback: (Boolean, String?) -> Unit) {
-        try {
-            // Vérifier si l'utilisateur est connecté
-            val userId = currentUser?.uid
-            if (userId == null) {
-                println("Error: uploadProduct - User not authenticated")
-                return callback(false, "Utilisateur non connecté")
-            }
-            
-            // Créer une référence pour le produit dans Firestore
-            val productRef = db.collection("products").document()
-            val productId = productRef.id
-            
-            // Créer le produit sans image d'abord
-            val productWithoutImage = product.copy(
-                id = productId,
-                imageUrl = null,
-                sellerName = currentUser?.displayName ?: "",
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            
-            // Convertir en Map pour Firestore
-            val productMap = hashMapOf(
-                "id" to productWithoutImage.id,
-                "name" to productWithoutImage.name,
-                "description" to productWithoutImage.description,
-                "price" to productWithoutImage.price,
-                "category" to productWithoutImage.category,
-                "condition" to productWithoutImage.condition,
-                "sellerUserId" to productWithoutImage.sellerUserId,
-                "sellerName" to productWithoutImage.sellerName,
-                "location" to productWithoutImage.location,
-                "imageUrl" to productWithoutImage.imageUrl,
-                "createdAt" to FieldValue.serverTimestamp(),
-                "updatedAt" to FieldValue.serverTimestamp(),
-                "isAvailable" to true,
-                "viewCount" to 0
-            )
-            
-            // Sauvegarder dans Firestore
-            productRef.set(productMap)
-                .addOnSuccessListener {
-                    // Si pas d'images, on a terminé
-                    if (images.isEmpty()) {
-                        callback(true, productId)
-                        return@addOnSuccessListener
-                    }
-                    
-                    // Sinon, on tente d'uploader la première image
-                    try {
-                        val imageRef = storage.reference.child("products/$productId/image_0.jpg")
-                        val uploadTask = imageRef.putFile(images[0])
-                        
-                        uploadTask.addOnSuccessListener {
-                            // Obtenir l'URL de l'image
-                            imageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
-                                // Mettre à jour le produit avec l'URL
-                                productRef.update("imageUrl", downloadUrl.toString())
-                                    .addOnSuccessListener {
-                                        callback(true, productId)
-                                    }
-                                    .addOnFailureListener { e ->
-                                        // Produit créé mais URL d'image non mise à jour
-                                        Log.e("FirebaseManager", "Erreur lors de la mise à jour de l'URL d'image: ${e.message}")
-                                        callback(true, productId)
-                                    }
-                            }.addOnFailureListener { e ->
-                                // Produit créé mais URL d'image non obtenue
-                                Log.e("FirebaseManager", "Erreur lors de l'obtention de l'URL d'image: ${e.message}")
-                                callback(true, productId)
-                            }
-                        }.addOnFailureListener { e ->
-                            // Produit créé mais image non uploadée
-                            Log.e("FirebaseManager", "Erreur lors de l'upload de l'image: ${e.message}")
-                            callback(true, productId)
-                        }
-                    } catch (e: Exception) {
-                        // Produit créé mais erreur lors de l'upload
-                        Log.e("FirebaseManager", "Exception lors de l'upload de l'image: ${e.message}")
-                        callback(true, productId)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    // Échec de la création du produit
-                    Log.e("FirebaseManager", "Erreur lors de la création du produit: ${e.message}")
-                    callback(false, e.message)
-                }
+    fun isUriAccessible(context: Context, uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.close()
+            true
         } catch (e: Exception) {
-            // Exception générale
-            Log.e("FirebaseManager", "Exception générale: ${e.message}")
-            callback(false, "Erreur inattendue: ${e.message}")
+            false
         }
     }
     
     /**
+     * Upload a product with multiple images
+     */
+    fun uploadProduct(product: Product, imageUris: List<Uri>, context: Context, callback: (Boolean, String?) -> Unit) {
+        // Validation initiale
+        if (imageUris.isEmpty()) {
+            callback(false, "Aucune image sélectionnée")
+            return
+        }
+
+        if (getCurrentUserId() == null) {
+            callback(false, "Utilisateur non connecté")
+            return
+        }
+
+        val productId = UUID.randomUUID().toString()
+        val imageUrls = mutableListOf<String>()
+        var uploadedCount = 0
+        var hasError = false
+
+        // Créer le dossier pour ce produit
+        val productFolder = "product_images/$productId"
+
+        imageUris.forEachIndexed { index, uri ->
+            try {
+                // Vérifier si l'URI est valide
+                if (uri.toString().isEmpty()) {
+                    Log.e(TAG, "URI invalide à l'index $index")
+                    if (!hasError) {
+                        hasError = true
+                        callback(false, "Image invalide détectée")
+                    }
+                    return@forEachIndexed
+                }
+
+                // Générer un nom de fichier unique
+                val fileName = "image_${System.currentTimeMillis()}_$index.jpg"
+                val imageRef = storage.reference.child(productFolder).child(fileName)
+
+                // Lire l'image
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val bytes = inputStream.readBytes()
+                    
+                    if (bytes.isEmpty()) {
+                        Log.e(TAG, "Fichier vide détecté pour l'URI: $uri")
+                        if (!hasError) {
+                            hasError = true
+                            callback(false, "Fichier image vide détecté")
+                        }
+                        return@forEachIndexed
+                    }
+
+                    // Créer les métadonnées
+                    val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                        .setContentType("image/jpeg")
+                        .setCustomMetadata("productId", productId)
+                        .setCustomMetadata("index", index.toString())
+                        .build()
+
+                    // Upload avec progression
+                    imageRef.putBytes(bytes, metadata)
+                        .addOnProgressListener { taskSnapshot ->
+                            val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
+                            Log.d(TAG, "Upload progress: $progress% for $fileName")
+                        }
+                        .addOnSuccessListener { taskSnapshot ->
+                            Log.d(TAG, "Image uploadée avec succès: $fileName")
+                            
+                            // Obtenir l'URL de téléchargement
+                            imageRef.downloadUrl
+                                .addOnSuccessListener { downloadUrl ->
+                                    synchronized(imageUrls) {
+                                        imageUrls.add(downloadUrl.toString())
+                                        uploadedCount++
+                                        
+                                        // Si toutes les images sont uploadées avec succès
+                                        if (uploadedCount == imageUris.size && !hasError) {
+                                            // Créer le document du produit
+                                            val productData = hashMapOf(
+                                                "titre" to product.title,
+                                                "description" to product.description,
+                                                "prix" to product.price,
+                                                "images" to imageUrls,
+                                                "categorie" to product.category,
+                                                "etat" to product.condition,
+                                                "localisation" to product.location,
+                                                "vendeurId" to (getCurrentUserId() ?: ""),
+                                                "vendeurNom" to (auth.currentUser?.displayName ?: ""),
+                                                "dateCreation" to FieldValue.serverTimestamp(),
+                                                "dateModification" to FieldValue.serverTimestamp()
+                                            )
+
+                                            // Sauvegarder dans Firestore
+                                            db.collection(PRODUCTS_COLLECTION)
+                                                .document(productId)
+                                                .set(productData)
+                                                .addOnSuccessListener {
+                                                    Log.d(TAG, "Produit ajouté avec succès dans Firestore")
+                                                    callback(true, null)
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Log.e(TAG, "Erreur lors de la sauvegarde du produit", e)
+                                                    // En cas d'erreur, supprimer les images uploadées
+                                                    deleteUploadedImages(productFolder)
+                                                    callback(false, "Erreur lors de la sauvegarde du produit: ${e.message}")
+                                                }
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e(TAG, "Erreur lors de l'obtention de l'URL pour $fileName", e)
+                                    if (!hasError) {
+                                        hasError = true
+                                        callback(false, "Erreur lors de l'obtention de l'URL: ${e.message}")
+                                    }
+                                }
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "Erreur lors de l'upload de $fileName", e)
+                            if (!hasError) {
+                                hasError = true
+                                callback(false, "Erreur lors de l'upload: ${e.message}")
+                            }
+                        }
+                } ?: run {
+                    Log.e(TAG, "Impossible d'ouvrir le flux pour l'URI: $uri")
+                    if (!hasError) {
+                        hasError = true
+                        callback(false, "Impossible d'accéder au fichier image")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erreur lors du traitement de l'image", e)
+                if (!hasError) {
+                    hasError = true
+                    callback(false, "Erreur lors du traitement de l'image: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Supprimer les images uploadées en cas d'erreur
+     */
+    private fun deleteUploadedImages(productFolder: String) {
+        try {
+            val folderRef = storage.reference.child(productFolder)
+            folderRef.listAll()
+                .addOnSuccessListener { result ->
+                    result.items.forEach { item ->
+                        item.delete()
+                            .addOnFailureListener { e ->
+                                Log.e(TAG, "Erreur lors de la suppression de ${item.path}", e)
+                            }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Erreur lors de la liste des fichiers à supprimer", e)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la suppression des images", e)
+        }
+    }
+
+    /**
      * Récupérer l'ID de l'utilisateur courant
      */
     fun getCurrentUserId(): String? {
-        val uid = currentUser?.uid
-        if (uid == null) {
-            println("Warning: getCurrentUserId - User not authenticated")
-        }
-        return uid
+        return auth.currentUser?.uid
     }
     
     // ===== PANIER =====
@@ -354,58 +410,46 @@ object FirebaseManager {
     /**
      * Récupérer les éléments du panier
      */
-    fun getCartItems(callback: (List<CartItem>, String?) -> Unit) {
-        val userId = currentUser?.uid ?: return callback(emptyList(), "Utilisateur non connecté")
+    suspend fun getCartItems(): List<CartItem> {
+        val userId = currentUser?.uid ?: throw Exception("User not logged in")
+        val cartItems = mutableListOf<CartItem>()
         
-        db.collection("users")
+        val result = db.collection("users")
             .document(userId)
             .collection("cart")
             .get()
-            .addOnSuccessListener { result ->
-                val cartItems = mutableListOf<CartItem>()
-                
-                if (result.documents.isEmpty()) {
-                    callback(emptyList(), null)
-                    return@addOnSuccessListener
-                }
-                
-                // Récupérer les détails des produits pour chaque élément du panier
-                result.documents.forEach { doc ->
-                    val productId = doc.getString("productId") ?: ""
-                    val quantity = doc.getLong("quantity")?.toInt() ?: 1
-                    
-                    // Convertir Timestamp en Long si nécessaire
-                    val timestamp = doc.get("addedAt") as? Timestamp
-                    val addedAt = timestamp?.seconds?.times(1000)?.plus(timestamp.nanoseconds / 1000000)
-                        ?: System.currentTimeMillis()
-                    
-                    getProductById(productId) { product, error ->
-                        if (product != null) {
-                            val productImage = product.imageUrl ?: ""
-                            cartItems.add(
-                                CartItem(
-                                    id = doc.id,
-                                    productId = productId,
-                                    userId = userId,
-                                    productName = product.name,
-                                    productImage = productImage,
-                                    productPrice = product.price,
-                                    quantity = quantity,
-                                    timestamp = addedAt
-                                )
-                            )
-                        }
-                        
-                        // Si nous avons traité tous les éléments, retourner la liste complète
-                        if (cartItems.size == result.size()) {
-                            callback(cartItems, null)
-                        }
-                    }
-                }
+            .await()
+            
+        if (result.documents.isEmpty()) {
+            return emptyList()
+        }
+        
+        for (doc in result.documents) {
+            val productId = doc.getString("productId") ?: ""
+            val quantity = doc.getLong("quantity")?.toInt() ?: 1
+            
+            val timestamp = doc.get("addedAt") as? Timestamp
+            val addedAt = timestamp?.seconds?.times(1000)?.plus(timestamp.nanoseconds / 1000000)
+                ?: System.currentTimeMillis()
+            
+            val product = getProductById(productId)
+            if (product != null) {
+                cartItems.add(
+                    CartItem(
+                        id = doc.id,
+                        productId = productId,
+                        userId = userId,
+                        productName = product.title,
+                        productImage = product.images.firstOrNull() ?: "",
+                        productPrice = product.price,
+                        quantity = quantity,
+                        timestamp = addedAt
+                    )
+                )
             }
-            .addOnFailureListener {
-                callback(emptyList(), it.message)
-            }
+        }
+        
+        return cartItems
     }
     
     /**
@@ -554,4 +598,6 @@ object FirebaseManager {
                 callback(false, it.message) 
             }
     }
+
+    fun isUserLoggedIn(): Boolean = auth.currentUser != null
 } 

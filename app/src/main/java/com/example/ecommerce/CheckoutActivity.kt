@@ -225,7 +225,7 @@ class CheckoutActivity : AppCompatActivity() {
             .setTitle("Commande confirmée")
             .setMessage("Votre commande a été placée avec succès. Numéro de commande: $orderId")
             .setPositiveButton("OK") { _, _ ->
-                val intent = Intent(this, HomeActivity::class.java)
+                val intent = Intent(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
                 startActivity(intent)
                 finish()

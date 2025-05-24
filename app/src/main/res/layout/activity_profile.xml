@@ -552,6 +552,21 @@
                     android:textColor="#00BCD4"
                     android:layout_marginTop="8dp" />
             </LinearLayout>
+
+            <!-- Logout Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/logoutButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="32dp"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="16dp"
+                android:text="Se déconnecter"
+                android:textAllCaps="false"
+                android:textColor="@color/error_red"
+                app:cornerRadius="8dp"
+                app:strokeColor="@color/error_red"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 

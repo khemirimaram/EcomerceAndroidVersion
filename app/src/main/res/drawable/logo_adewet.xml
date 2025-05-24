@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="390dp"
+    android:height="90dp"
+    android:viewportWidth="390"
+    android:viewportHeight="90">
+
+    <!-- Ombre sous le logo -->
+    <path
+        android:fillAlpha="0.25"
+        android:fillColor="#90CAF9"
+        android:pathData="M60,80 a160,8 0 1,0 320,0 a160,8 0 1,0 -320,0" />
+
+    <!-- Texte A (bleu) -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M65,68 L90,20 L115,68 M75,50 L105,50"
+        android:strokeWidth="4"
+        android:strokeColor="#1976D2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Rapporteur pour le D -->
+    <path
+        android:fillColor="#FFD600"
+        android:pathData="M120,68 A22,22 0 1,0 120,24"
+        android:strokeWidth="2.5"
+        android:strokeColor="#388E3C" />
+    
+    <path
+        android:strokeColor="#388E3C"
+        android:strokeWidth="1.5"
+        android:pathData="M120,46 L142,46" />
+    
+    <path
+        android:strokeColor="#388E3C"
+        android:strokeWidth="1"
+        android:pathData="M120,36 L138,36" />
+    
+    <path
+        android:strokeColor="#388E3C"
+        android:strokeWidth="1"
+        android:pathData="M120,58 L140,58" />
+    
+    <path
+        android:fillColor="#43A047"
+        android:pathData="M117,24 h5 v44 h-5 z" />
+
+    <!-- Texte E (orange) -->
+    <path
+        android:fillColor="#FB8C00"
+        android:pathData="M145,24 h30 v8 h-22 v10 h20 v8 h-20 v10 h22 v8 h-30 z" />
+
+    <!-- Texte W (violet) -->
+    <path
+        android:fillColor="#8E24AA"
+        android:pathData="M195,24 l15,44 l15,-44 l15,44 l15,-44 h-10 l-10,30 l-10,-30 l-10,30 l-10,-30 z" />
+
+    <!-- Texte E (bleu clair) -->
+    <path
+        android:fillColor="#42A5F5"
+        android:pathData="M260,24 h30 v8 h-22 v10 h20 v8 h-20 v10 h22 v8 h-30 z" />
+
+    <!-- Texte T (rouge) -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M310,24 h30 v8 h-11 v36 h-8 v-36 h-11 z" />
+
+    <!-- Stylo stylisé pour le I -->
+    <group>
+        <!-- Point du i -->
+        <path
+            android:fillColor="#00BFAE"
+            android:pathData="M365,16 a6,6 0 1,0 0.1,0 z" />
+        
+        <!-- Pointe du stylo -->
+        <path
+            android:fillColor="#FFD600"
+            android:strokeColor="#FFA000"
+            android:strokeWidth="1"
+            android:pathData="M360,28 L370,28 L365,16 z" />
+        
+        <!-- Corps du stylo -->
+        <path
+            android:fillColor="#00BFAE"
+            android:strokeColor="#00897B"
+            android:strokeWidth="2"
+            android:pathData="M360,28 h10 v40 h-10 z" />
+        
+        <!-- Clip du stylo -->
+        <path
+            android:fillColor="#42A5F5"
+            android:pathData="M362,60 h6 v8 h-6 z" />
+    </group>
+</vector> 

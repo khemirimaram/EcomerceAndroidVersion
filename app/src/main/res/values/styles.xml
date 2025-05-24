@@ -17,4 +17,26 @@
     <style name="Theme.ECommerceApp.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
     <style name="Theme.ECommerceApp.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <style name="SpinnerStyle" parent="Widget.AppCompat.Spinner">
+        <item name="android:background">@drawable/custom_spinner_bg</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/text_gray</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <style name="SpinnerDropDownStyle" parent="Widget.AppCompat.DropDownItem.Spinner">
+        <item name="android:padding">12dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="CustomSpinnerStyle" parent="Widget.AppCompat.Spinner">
+        <item name="android:background">@drawable/custom_spinner_bg</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
 </resources> 

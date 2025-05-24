@@ -2,32 +2,29 @@ package com.example.ecommerce
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.Toast
+import android.util.Patterns
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 class RegisterActivity : AppCompatActivity() {
-    private lateinit var emailEditText: EditText
-    private lateinit var firstNameEditText: EditText
-    private lateinit var lastNameEditText: EditText
-    private lateinit var passwordEditText: EditText
-    private lateinit var dayEditText: EditText
-    private lateinit var monthEditText: EditText
-    private lateinit var yearEditText: EditText
-    private lateinit var genderRadioGroup: RadioGroup
-    private lateinit var femaleRadioButton: RadioButton
-    private lateinit var maleRadioButton: RadioButton
-    private lateinit var registerButton: Button
-    private lateinit var passwordToggle: ImageView
+    private lateinit var firstNameEditText: TextInputEditText
+    private lateinit var lastNameEditText: TextInputEditText
+    private lateinit var emailEditText: TextInputEditText
+    private lateinit var passwordEditText: TextInputEditText
+    private lateinit var confirmPasswordEditText: TextInputEditText
+    
+    private lateinit var firstNameLayout: TextInputLayout
+    private lateinit var lastNameLayout: TextInputLayout
+    private lateinit var emailLayout: TextInputLayout
+    private lateinit var passwordLayout: TextInputLayout
+    private lateinit var confirmPasswordLayout: TextInputLayout
+    
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
-    private var passwordVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,138 +35,156 @@ class RegisterActivity : AppCompatActivity() {
         db = FirebaseFirestore.getInstance()
 
         // Initialize views
-        emailEditText = findViewById(R.id.emailEditText)
+        initializeViews()
+        setupClickListeners()
+    }
+
+    private fun initializeViews() {
         firstNameEditText = findViewById(R.id.firstNameEditText)
         lastNameEditText = findViewById(R.id.lastNameEditText)
+        emailEditText = findViewById(R.id.emailEditText)
         passwordEditText = findViewById(R.id.passwordEditText)
-        dayEditText = findViewById(R.id.dayEditText)
-        monthEditText = findViewById(R.id.monthEditText)
-        yearEditText = findViewById(R.id.yearEditText)
-        genderRadioGroup = findViewById(R.id.genderRadioGroup)
-        femaleRadioButton = findViewById(R.id.femaleRadioButton)
-        maleRadioButton = findViewById(R.id.maleRadioButton)
-        registerButton = findViewById(R.id.registerButton)
-        passwordToggle = findViewById(R.id.passwordToggle)
+        confirmPasswordEditText = findViewById(R.id.confirmPasswordEditText)
+        
+        firstNameLayout = findViewById(R.id.firstNameLayout)
+        lastNameLayout = findViewById(R.id.lastNameLayout)
+        emailLayout = findViewById(R.id.emailLayout)
+        passwordLayout = findViewById(R.id.passwordLayout)
+        confirmPasswordLayout = findViewById(R.id.confirmPasswordLayout)
+    }
 
-        // Set up click listeners
-        registerButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
-            val firstName = firstNameEditText.text.toString().trim()
-            val lastName = lastNameEditText.text.toString().trim()
-            val password = passwordEditText.text.toString()
-            val day = dayEditText.text.toString().trim()
-            val month = monthEditText.text.toString().trim()
-            val year = yearEditText.text.toString().trim()
-            val gender = if (femaleRadioButton.isChecked) "female" else "male"
-
-            // Validate inputs
-            if (!validateInputs(email, firstName, lastName, password, day, month, year)) {
-                return@setOnClickListener
+    private fun setupClickListeners() {
+        findViewById<android.view.View>(R.id.registerButton).setOnClickListener {
+            if (validateInputs()) {
+                registerUser()
             }
-            
-            // Create account
-            createAccount(email, password, firstName, lastName, "$day/$month/$year", gender)
         }
 
-        // Handle password visibility toggle
-        passwordToggle.setOnClickListener {
-            passwordVisible = !passwordVisible
-            togglePasswordVisibility(passwordVisible)
+        findViewById<android.view.View>(R.id.loginTextView).setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
         }
     }
 
-    private fun togglePasswordVisibility(isVisible: Boolean) {
-        if (isVisible) {
-            // Show password
-            passwordEditText.transformationMethod = null
-            passwordToggle.setImageResource(R.drawable.ic_visibility_off)
-        } else {
-            // Hide password
-            passwordEditText.transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
-            passwordToggle.setImageResource(R.drawable.ic_visibility)
+    private fun validateInputs(): Boolean {
+        var isValid = true
+        
+        // Reset all errors
+        firstNameLayout.error = null
+        lastNameLayout.error = null
+        emailLayout.error = null
+        passwordLayout.error = null
+        confirmPasswordLayout.error = null
+
+        val firstName = firstNameEditText.text?.toString()?.trim() ?: ""
+        val lastName = lastNameEditText.text?.toString()?.trim() ?: ""
+        val email = emailEditText.text?.toString()?.trim() ?: ""
+        val password = passwordEditText.text?.toString() ?: ""
+        val confirmPassword = confirmPasswordEditText.text?.toString() ?: ""
+
+        if (firstName.isEmpty()) {
+            firstNameLayout.error = "Veuillez entrer votre prénom"
+            isValid = false
         }
-        // Move cursor to the end of text
-        passwordEditText.setSelection(passwordEditText.text.length)
+
+        if (lastName.isEmpty()) {
+            lastNameLayout.error = "Veuillez entrer votre nom"
+            isValid = false
+        }
+
+        if (email.isEmpty()) {
+            emailLayout.error = "Veuillez entrer votre email"
+            isValid = false
+        } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailLayout.error = "Veuillez entrer un email valide"
+            isValid = false
+        }
+
+        if (password.isEmpty()) {
+            passwordLayout.error = "Veuillez entrer un mot de passe"
+            isValid = false
+        } else if (password.length < 6) {
+            passwordLayout.error = "Le mot de passe doit contenir au moins 6 caractères"
+            isValid = false
+        }
+
+        if (confirmPassword.isEmpty()) {
+            confirmPasswordLayout.error = "Veuillez confirmer votre mot de passe"
+            isValid = false
+        } else if (password != confirmPassword) {
+            confirmPasswordLayout.error = "Les mots de passe ne correspondent pas"
+            isValid = false
+        }
+
+        return isValid
     }
 
-    private fun validateInputs(
-        email: String,
-        firstName: String,
-        lastName: String,
-        password: String,
-        day: String,
-        month: String,
-        year: String
-    ): Boolean {
-        when {
-            email.isEmpty() || firstName.isEmpty() || lastName.isEmpty() || 
-            password.isEmpty() || day.isEmpty() || month.isEmpty() || year.isEmpty() -> {
-                Toast.makeText(this, "Veuillez remplir tous les champs", Toast.LENGTH_SHORT).show()
-                return false
-            }
-            !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
-                Toast.makeText(this, "Veuillez entrer une adresse email valide", Toast.LENGTH_SHORT).show()
-                return false
-            }
-            password.length < 6 -> {
-                Toast.makeText(this, "Le mot de passe doit contenir au moins 6 caractères", Toast.LENGTH_SHORT).show()
-                return false
-            }
-            !isValidDate(day, month, year) -> {
-                Toast.makeText(this, "Veuillez entrer une date de naissance valide", Toast.LENGTH_SHORT).show()
-                return false
-            }
-            else -> return true
-        }
-    }
+    private fun registerUser() {
+        val email = emailEditText.text?.toString()?.trim() ?: ""
+        val password = passwordEditText.text?.toString() ?: ""
+        val firstName = firstNameEditText.text?.toString()?.trim() ?: ""
+        val lastName = lastNameEditText.text?.toString()?.trim() ?: ""
 
-    private fun isValidDate(day: String, month: String, year: String): Boolean {
-        try {
-            val dayInt = day.toInt()
-            val monthInt = month.toInt()
-            val yearInt = year.toInt()
-            
-            if (dayInt < 1 || dayInt > 31 || monthInt < 1 || monthInt > 12 || yearInt < 1900 || yearInt > 2020) {
-                return false
-            }
-            
-            // Further date validation could be added here
-            return true
-        } catch (e: NumberFormatException) {
-            return false
-        }
-    }
+        val loadingDialog = AlertDialog.Builder(this)
+            .setMessage("Création du compte en cours...")
+            .setCancelable(false)
+            .create()
+        loadingDialog.show()
 
-    private fun createAccount(email: String, password: String, firstName: String, lastName: String, 
-                              dateOfBirth: String, gender: String) {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Save user details to Firestore
-                    val user = hashMapOf(
+                    // Save user additional info in Firestore
+                    val user = auth.currentUser
+                    val userInfo = hashMapOf(
                         "firstName" to firstName,
                         "lastName" to lastName,
-                        "email" to email,
-                        "dateOfBirth" to dateOfBirth,
-                        "gender" to gender,
-                        "createdAt" to com.google.firebase.Timestamp.now()
+                        "email" to email
                     )
 
-                    db.collection("users")
-                        .document(auth.currentUser!!.uid)
-                        .set(user)
-                        .addOnSuccessListener {
-                            startActivity(Intent(this, MainActivity::class.java))
-                            finish()
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Erreur lors de la sauvegarde des données: ${e.message}",
-                                Toast.LENGTH_SHORT).show()
-                        }
+                    user?.let { firebaseUser ->
+                        db.collection("users")
+                            .document(firebaseUser.uid)
+                            .set(userInfo)
+                            .addOnSuccessListener {
+                                loadingDialog.dismiss()
+                                showSuccessDialog()
+                            }
+                            .addOnFailureListener { e ->
+                                loadingDialog.dismiss()
+                                showErrorDialog("Erreur lors de la sauvegarde des informations: ${e.message}")
+                            }
+                    }
                 } else {
-                    Toast.makeText(this, "Échec de l'inscription: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT).show()
+                    loadingDialog.dismiss()
+                    val errorMessage = when (task.exception?.message) {
+                        "The email address is already in use by another account." ->
+                            "Cette adresse email est déjà utilisée"
+                        "The email address is badly formatted." ->
+                            "Format d'email invalide"
+                        else -> "Erreur lors de la création du compte: ${task.exception?.message}"
+                    }
+                    showErrorDialog(errorMessage)
                 }
             }
+    }
+
+    private fun showSuccessDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Compte créé")
+            .setMessage("Votre compte a été créé avec succès !")
+            .setPositiveButton("OK") { _, _ ->
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+            }
+            .show()
+    }
+
+    private fun showErrorDialog(message: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Erreur")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
     }
 } 

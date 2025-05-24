@@ -16,7 +16,7 @@
     
     <!-- Couleurs personnalisées pour ADAWATI -->
     <color name="primary_blue">#4285F4</color>
-    <color name="text_gray">#666666</color>
+    <color name="text_gray">#757575</color>
     <color name="error_red">#DC3545</color>
     <color name="background_white">#FFFFFF</color>
     <color name="input_background">#F8F9FA</color>
@@ -32,9 +32,9 @@
     <color name="turquoise_accent">#26A69A</color>  <!-- Couleur d'accent turquoise -->
     
     <!-- Nouvelles couleurs bleues pour formulaires avancés -->
-    <color name="gradient_blue_start">#304FFE</color>    <!-- Bleu royal foncé -->
-    <color name="gradient_blue_mid">#3D5AFE</color>      <!-- Bleu indigo -->
-    <color name="gradient_blue_end">#536DFE</color>      <!-- Bleu indigo clair -->
+    <color name="gradient_blue_start">#4A90E2</color>
+    <color name="gradient_blue_mid">#357ABD</color>
+    <color name="gradient_blue_end">#2B5F9E</color>
     <color name="form_blue_bg">#EBF5FB</color>           <!-- Bleu très clair pour le fond des entrées -->
     <color name="deep_blue">#1A237E</color>              <!-- Bleu très foncé -->
     

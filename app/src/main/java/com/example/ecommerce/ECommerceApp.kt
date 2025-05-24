@@ -2,6 +2,7 @@ package com.example.ecommerce
 
 import android.app.Application
 import android.util.Log
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,6 +20,15 @@ class ECommerceApp : Application() {
         try {
             // Initialize Firebase
             FirebaseApp.initializeApp(this)
+            
+            // Check Google Play Services
+            val googleApiAvailability = GoogleApiAvailability.getInstance()
+            val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
+            if (resultCode != com.google.android.gms.common.ConnectionResult.SUCCESS) {
+                Log.e(TAG, "Google Play Services is not available (status=$resultCode)")
+            } else {
+                Log.d(TAG, "Google Play Services is available")
+            }
             
             // Log initialization success
             val auth = FirebaseAuth.getInstance()

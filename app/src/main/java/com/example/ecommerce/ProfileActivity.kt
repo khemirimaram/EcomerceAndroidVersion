@@ -6,11 +6,14 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import com.example.ecommerce.databinding.ActivityProfileBinding
 import com.example.ecommerce.models.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import de.hdodenhof.circleimageview.CircleImageView
 
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
@@ -33,6 +36,17 @@ class ProfileActivity : AppCompatActivity() {
             
             setContentView(binding.root)
             Log.d(TAG, "3. setContentView appelé")
+
+            // Configurer immédiatement le bouton de déconnexion
+            try {
+                binding.logoutButton.setOnClickListener {
+                    showLogoutConfirmationDialog()
+                }
+                binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
+                Log.d(TAG, "Bouton de déconnexion configuré")
+            } catch (e: Exception) {
+                Log.e(TAG, "Erreur lors de la configuration du bouton de déconnexion: ${e.message}")
+            }
             
             // Masquer immédiatement la section produits
             hideProductSection()
@@ -48,7 +62,7 @@ class ProfileActivity : AppCompatActivity() {
             // Bouton retour
             try {
                 binding.ivBack.setOnClickListener {
-                finish()
+                    finish()
                 }
                 Log.d(TAG, "5. Bouton retour configuré")
             } catch (e: Exception) {
@@ -73,7 +87,7 @@ class ProfileActivity : AppCompatActivity() {
             // Charger le profil utilisateur
             loadUserProfile()
             
-            // Configurer les boutons
+            // Configurer les autres boutons
             setupButtons()
             
             Log.d(TAG, "6. ProfileActivity onCreate terminé")
@@ -82,9 +96,15 @@ class ProfileActivity : AppCompatActivity() {
             Log.e(TAG, "Erreur globale dans ProfileActivity: ${e.message}")
             e.printStackTrace()
             
+            // S'assurer que le bouton de déconnexion est visible si l'utilisateur est connecté
+            try {
+                binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
+            } catch (e: Exception) {
+                Log.e(TAG, "Erreur lors de la configuration du bouton de déconnexion: ${e.message}")
+            }
+            
             // Afficher un message d'erreur à l'utilisateur
             Toast.makeText(this, "Erreur lors du chargement du profil: ${e.message}", Toast.LENGTH_LONG).show()
-            finish() // Terminer l'activité en cas d'erreur
         }
     }
     
@@ -245,14 +265,26 @@ class ProfileActivity : AppCompatActivity() {
             // Masquer les sections produits
             hideProductSection()
             
-            // Rendre les boutons d'interaction visibles
-            binding.btnEditProfile.visibility = View.VISIBLE
-            binding.tvLeaveReview.visibility = View.VISIBLE
-            binding.btnSendMessage.visibility = View.VISIBLE
+            // Gérer la visibilité des boutons
+            if (userId == auth.currentUser?.uid) {
+                // C'est le profil de l'utilisateur connecté
+                binding.btnEditProfile.visibility = View.VISIBLE
+                binding.tvLeaveReview.visibility = View.GONE
+                binding.btnSendMessage.visibility = View.GONE
+                binding.logoutButton.visibility = View.VISIBLE
+            } else {
+                // C'est le profil d'un autre utilisateur
+                binding.btnEditProfile.visibility = View.GONE
+                binding.tvLeaveReview.visibility = View.VISIBLE
+                binding.btnSendMessage.visibility = View.VISIBLE
+                binding.logoutButton.visibility = View.GONE
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "Erreur dans updateUI: ${e.message}")
             binding.profileImage.setImageResource(R.drawable.ic_person)
+            // En cas d'erreur, on affiche quand même le bouton de déconnexion si l'utilisateur est connecté
+            binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
         }
     }
     
@@ -352,6 +384,77 @@ class ProfileActivity : AppCompatActivity() {
             Log.d(TAG, "Section produits masquée avec succès")
         } catch (e: Exception) {
             Log.e(TAG, "Erreur lors de la suppression des produits: ${e.message}")
+        }
+    }
+
+    private fun showLogoutConfirmationDialog() {
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("Déconnexion")
+                .setMessage("Êtes-vous sûr de vouloir vous déconnecter ?")
+                .setPositiveButton("Oui") { dialog, _ ->
+                    try {
+                        logout()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erreur lors de la déconnexion: ${e.message}")
+                        Toast.makeText(this, "Erreur lors de la déconnexion", Toast.LENGTH_SHORT).show()
+                    }
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Non") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .setCancelable(true)
+                .create()
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de l'affichage du dialogue de déconnexion: ${e.message}")
+            // En cas d'erreur, on essaie quand même de déconnecter
+            logout()
+        }
+    }
+
+    private fun logout() {
+        try {
+            // Vérifier si l'utilisateur est connecté
+            if (auth.currentUser == null) {
+                Log.w(TAG, "Tentative de déconnexion alors qu'aucun utilisateur n'est connecté")
+                redirectToMain()
+                return
+            }
+
+            // Déconnexion de Firebase
+            auth.signOut()
+            Log.d(TAG, "Utilisateur déconnecté avec succès")
+
+            // Redirection vers MainActivity
+            redirectToMain()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la déconnexion: ${e.message}")
+            e.printStackTrace()
+            // Même en cas d'erreur, on essaie de rediriger
+            redirectToMain()
+        }
+    }
+
+    private fun redirectToMain() {
+        try {
+            // Créer l'intent pour MainActivity
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            
+            // Démarrer MainActivity
+            startActivity(intent)
+            
+            // Fermer l'activité actuelle
+            finish()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la redirection vers MainActivity: ${e.message}")
+            e.printStackTrace()
+            // En dernier recours, on essaie juste de fermer l'activité
+            finish()
         }
     }
 } 

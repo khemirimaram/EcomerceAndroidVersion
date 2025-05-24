@@ -10,9 +10,11 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.ecommerce.databinding.ActivityAddProductBinding
 import com.example.ecommerce.firebase.FirebaseManager
 import com.example.ecommerce.models.Product
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import android.Manifest
@@ -20,305 +22,281 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.firebase.firestore.FirebaseFirestore
+import com.cloudinary.Cloudinary
+import com.cloudinary.utils.ObjectUtils
 
 class AddProductActivity : AppCompatActivity() {
+    companion object {
+        private const val TAG = "AddProductActivity"
+    }
+
     private lateinit var binding: ActivityAddProductBinding
     private val selectedImages = mutableListOf<Uri>()
     private val MAX_IMAGES = 5
-    private val STORAGE_PERMISSION_CODE = 1001
     
-    // Uri temporaires pour les images converties
-    private val tempImageUris = mutableListOf<Uri>()
-    
-    private val pickImagesLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // Gestion de la sélection unique
-            result.data?.data?.let { uri ->
-                if (selectedImages.size < MAX_IMAGES) {
-                    selectedImages.add(uri)
-                    updateImageCountText()
-                } else {
-                    Toast.makeText(this, "Maximum $MAX_IMAGES images autorisées", Toast.LENGTH_SHORT).show()
-                }
-            }
+    private val imagePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris != null) {
+            val remainingSlots = MAX_IMAGES - selectedImages.size
+            val validUris = uris.take(remainingSlots)
             
-            // Gestion de la sélection multiple
-            val clipData = result.data?.clipData
-            if (clipData != null) {
-                val countToAdd = minOf(clipData.itemCount, MAX_IMAGES - selectedImages.size)
-                for (i in 0 until countToAdd) {
-                    clipData.getItemAt(i)?.uri?.let { selectedImages.add(it) }
-                }
-                updateImageCountText()
-                
-                if (clipData.itemCount > countToAdd) {
-                    Toast.makeText(this, "Maximum $MAX_IMAGES images autorisées", Toast.LENGTH_SHORT).show()
-                }
+            selectedImages.addAll(validUris)
+            updateImageCountText()
+            
+            if (uris.size > remainingSlots) {
+                Toast.makeText(this, "Maximum $MAX_IMAGES images autorisées", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityAddProductBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        
-        // Vérifier que l'utilisateur est connecté avant d'autoriser l'ajout de produit
-        if (FirebaseManager.getCurrentUserId() == null) {
-            Toast.makeText(this, "Vous devez être connecté pour ajouter un produit", Toast.LENGTH_LONG).show()
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
-        
-        setupUI()
-    }
-    
-    private fun setupUI() {
-        setupCategorySpinner()
-        setupConditionSpinner()
-        setupClickListeners()
-    }
-    
-    private fun setupCategorySpinner() {
-        val categories = arrayOf("Autre", "Électronique", "Livres", "Vêtements", "Sports", "Maison", "Jardin", "Calculatrices")
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerCategory.adapter = adapter
-    }
-    
-    private fun setupConditionSpinner() {
-        val conditions = arrayOf("Bon état", "Neuf", "Comme neuf", "État moyen", "À rénover")
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, conditions)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerCondition.adapter = adapter
-    }
-    
-    private fun setupClickListeners() {
-        // Bouton de sélection d'images
-        binding.btnSelectImages.setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.type = "image/*"
-            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-            pickImagesLauncher.launch(intent)
-        }
-        
-        // Bouton d'annulation
-        binding.btnCancel.setOnClickListener {
-            finish()
-        }
-        
-        // Bouton de soumission
-        binding.btnSubmit.setOnClickListener {
-            submitProduct()
-        }
-    }
-    
-    private fun updateImageCountText() {
-        binding.tvImageCount.text = "${selectedImages.size}/$MAX_IMAGES images sélectionnées"
-        binding.tvImageCount.visibility = if (selectedImages.isEmpty()) View.GONE else View.VISIBLE
-    }
-    
-    private fun submitProduct() {
-        // Validation des entrées
-        val name = binding.etProductName.text.toString().trim()
-        val description = binding.etDescription.text.toString().trim()
-        val priceText = binding.etPrice.text.toString().trim()
-        val category = binding.spinnerCategory.selectedItem.toString()
-        val condition = binding.spinnerCondition.selectedItem.toString()
-        val quantity = binding.etQuantity.text.toString().trim()
-        
-        // Vérification des champs obligatoires
-        if (name.isEmpty()) {
-            binding.etProductName.error = "Champ obligatoire"
-            return
-        }
-        
-        if (description.isEmpty()) {
-            binding.etDescription.error = "Champ obligatoire"
-            return
-        }
-        
-        if (priceText.isEmpty()) {
-            binding.etPrice.error = "Champ obligatoire"
-            return
-        }
-        
-        val price = priceText.toDoubleOrNull()
-        if (price == null || price <= 0) {
-            binding.etPrice.error = "Prix invalide"
-            return
-        }
-        
-        if (selectedImages.isEmpty()) {
-            Toast.makeText(this, "Veuillez sélectionner au moins une image", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        // Afficher le chargement
-        binding.progressBar.visibility = View.VISIBLE
-        binding.btnSubmit.isEnabled = false
-        
-        // Log des URIs des images sélectionnées pour débogage
-        for (uri in selectedImages) {
-            Log.d("AddProductActivity", "Image URI sélectionnée: $uri")
-        }
-        
-        // Vérifier les permissions de stockage si nécessaire
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    STORAGE_PERMISSION_CODE
-                )
+        try {
+            Log.d(TAG, "Initialisation de l'activité")
+            binding = ActivityAddProductBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+            
+            // Check if user is logged in
+            if (FirebaseManager.getCurrentUserId() == null) {
+                Toast.makeText(this, "Veuillez vous connecter pour ajouter un produit", Toast.LENGTH_LONG).show()
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
                 return
             }
+
+            setupSpinners()
+            setupImageSelection()
+            setupButtons()
+            
+            Log.d(TAG, "Initialisation terminée avec succès")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de l'initialisation de l'activité", e)
+            Toast.makeText(this, "Erreur lors de l'initialisation de l'application", Toast.LENGTH_LONG).show()
+            finish()
         }
-        
-        // Convertir les URIs en fichiers temporaires si nécessaire
-        convertGoogleDriveUris(selectedImages) { convertedUris ->
-            // Enregistrer les URIs converties pour les nettoyer plus tard
-            tempImageUris.clear()
-            tempImageUris.addAll(convertedUris)
+    }
+
+    private fun setupSpinners() {
+        try {
+            Log.d(TAG, "Configuration des spinners")
+            // Configuration du spinner de catégorie
+            val categoryAdapter = ArrayAdapter.createFromResource(
+                this,
+                R.array.product_categories,
+                android.R.layout.simple_spinner_item
+            ).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            binding.spinnerCategory.adapter = categoryAdapter
+
+            // Configuration du spinner d'état
+            val conditionAdapter = ArrayAdapter.createFromResource(
+                this,
+                R.array.product_conditions,
+                android.R.layout.simple_spinner_item
+            ).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            binding.spinnerCondition.adapter = conditionAdapter
+
+            Log.d(TAG, "Spinners configurés avec succès")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la configuration des spinners", e)
+            Toast.makeText(this, "Erreur lors de l'initialisation des listes déroulantes", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setupImageSelection() {
+        try {
+            Log.d(TAG, "Configuration de la sélection d'images")
+            binding.btnSelectImages.setOnClickListener {
+                if (selectedImages.size >= MAX_IMAGES) {
+                    Toast.makeText(this, "Maximum $MAX_IMAGES images autorisées", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                imagePickerLauncher.launch("image/*")
+            }
+
+            binding.tvImageCount.visibility = View.VISIBLE
+            updateImageCountText()
+            Log.d(TAG, "Sélection d'images configurée avec succès")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la configuration de la sélection d'images", e)
+        }
+    }
+
+    private fun setupButtons() {
+        try {
+            Log.d(TAG, "Configuration des boutons")
+            binding.btnSubmit.setOnClickListener {
+                if (validateInputs()) {
+                    submitProduct()
+                }
+            }
             
-            // Créer l'objet produit
-            val product = Product(
-                id = "",
-                name = name,
-                description = description,
-                price = price,
-                category = category,
-                condition = condition,
-                sellerUserId = FirebaseManager.getCurrentUserId() ?: "",
-                sellerName = "",
-                location = "Tunisie", // Valeur par défaut
-                imageUrl = null,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            
-            // Télécharger le produit avec les images
-            FirebaseManager.uploadProduct(product, convertedUris) { success, message ->
+            binding.btnCancel.setOnClickListener {
+                finish()
+            }
+            Log.d(TAG, "Boutons configurés avec succès")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la configuration des boutons", e)
+        }
+    }
+
+    private fun updateImageCountText() {
+        binding.tvImageCount.text = "${selectedImages.size}/$MAX_IMAGES images sélectionnées"
+    }
+
+    private fun validateInputs(): Boolean {
+        try {
+            Log.d(TAG, "Validation des entrées")
+            val title = binding.etProductName.text.toString().trim()
+            val description = binding.etDescription.text.toString().trim()
+            val priceText = binding.etPrice.text.toString().trim()
+            val categoryPosition = binding.spinnerCategory.selectedItemPosition
+            val conditionPosition = binding.spinnerCondition.selectedItemPosition
+
+            if (title.isEmpty()) {
+                binding.etProductName.error = "Le nom du produit est requis"
+                return false
+            }
+
+            if (description.isEmpty()) {
+                binding.etDescription.error = "La description est requise"
+                return false
+            }
+
+            if (priceText.isEmpty()) {
+                binding.etPrice.error = "Le prix est requis"
+                return false
+            }
+
+            val price = priceText.toDoubleOrNull()
+            if (price == null || price <= 0) {
+                binding.etPrice.error = "Prix invalide"
+                return false
+            }
+
+            if (categoryPosition == 0) {
+                Toast.makeText(this, "Veuillez sélectionner une catégorie", Toast.LENGTH_SHORT).show()
+                return false
+            }
+
+            if (conditionPosition == 0) {
+                Toast.makeText(this, "Veuillez sélectionner l'état du produit", Toast.LENGTH_SHORT).show()
+                return false
+            }
+
+            if (selectedImages.isEmpty()) {
+                Toast.makeText(this, "Veuillez sélectionner au moins une image", Toast.LENGTH_SHORT).show()
+                return false
+            }
+
+            Log.d(TAG, "Validation des entrées réussie")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur lors de la validation des entrées", e)
+            return false
+        }
+    }
+
+    private fun submitProduct() {
+        try {
+            Log.d(TAG, "Début de la soumission du produit")
+            binding.progressBar.visibility = View.VISIBLE
+            binding.btnSubmit.isEnabled = false
+
+            val title = binding.etProductName.text.toString().trim()
+            val description = binding.etDescription.text.toString().trim()
+            val price = binding.etPrice.text.toString().toDouble()
+            val category = binding.spinnerCategory.selectedItem.toString()
+            val condition = binding.spinnerCondition.selectedItem.toString()
+
+            uploadImages(selectedImages) { imageUrls, error ->
                 runOnUiThread {
-                    binding.progressBar.visibility = View.GONE
-                    binding.btnSubmit.isEnabled = true
-                    
-                    if (success) {
-                        Toast.makeText(this, "Produit ajouté avec succès", Toast.LENGTH_SHORT).show()
-                        // Nettoyer les fichiers temporaires avant de quitter
-                        cleanupTempFiles()
-                        finish()
+                    if (error != null) {
+                        handleError("Erreur lors de l'upload des images: $error")
+                        return@runOnUiThread
+                    }
+
+                    val product = Product(
+                        name = title,
+                        description = description,
+                        price = price,
+                        category = category,
+                        condition = condition,
+                        location = "Not specified",
+                        sellerUserId = FirebaseManager.getCurrentUserId() ?: "",
+                        sellerName = "",
+                        images = imageUrls ?: listOf()
+                    )
+
+                    FirebaseFirestore.getInstance().collection("produits")
+                        .add(product)
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Produit ajouté avec succès")
+                            Toast.makeText(this, "Produit ajouté avec succès", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                        .addOnFailureListener { e ->
+                            handleError("Erreur lors de l'ajout du produit: ${e.message}")
+                        }
+                }
+            }
+        } catch (e: Exception) {
+            handleError("Erreur inattendue: ${e.message}")
+        }
+    }
+
+    private fun uploadImages(imageUris: List<Uri>, callback: (List<String>?, String?) -> Unit) {
+        Thread {
+            try {
+                Log.d(TAG, "Début de l'upload vers Cloudinary")
+
+                val urls = mutableListOf<String>()
+
+                // 🔽 Initialize Cloudinary using HashMap config
+                val config: HashMap<String, String> = HashMap()
+                config["cloud_name"] = "dhfckhxho"     // <- Replace this
+                config["api_secret"] = "eIt_X-J67PbzXTeA3ICA2KGLSGA"
+                config["api_key"] = "195454145722799"     // <- Replace this
+
+                val cloudinary = Cloudinary(config)
+
+                for (uri in imageUris) {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val uploadResult = cloudinary.uploader().upload(inputStream, ObjectUtils.emptyMap())
+                    val url = uploadResult["secure_url"] as? String
+                    if (url != null) {
+                        urls.add(url)
                     } else {
-                        Toast.makeText(this, "Erreur: $message", Toast.LENGTH_SHORT).show()
-                        Log.e("AddProductActivity", "Erreur lors de l'ajout du produit: $message")
-                        // Nettoyer les fichiers temporaires même en cas d'erreur
-                        cleanupTempFiles()
-                    }
-                }
-            }
-        }
-    }
-    
-    private fun convertGoogleDriveUris(originalUris: List<Uri>, callback: (List<Uri>) -> Unit) {
-        val convertedUris = mutableListOf<Uri>()
-        var remaining = originalUris.size
-        
-        if (originalUris.isEmpty()) {
-            callback(convertedUris)
-            return
-        }
-        
-        for (uri in originalUris) {
-            try {
-                // Pour tous les types d'URIs, on va créer des fichiers temporaires
-                // pour s'assurer que Firebase Storage peut les lire
-                val inputStream = contentResolver.openInputStream(uri)
-                if (inputStream != null) {
-                    try {
-                        // Créer un fichier temporaire avec extension .jpg
-                        val timestamp = System.currentTimeMillis()
-                        val tempFile = File(cacheDir, "temp_img_${timestamp}.jpg")
-                        val outputStream = FileOutputStream(tempFile)
-                        
-                        // Copier le contenu
-                        val buffer = ByteArray(4096)
-                        var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
+                        runOnUiThread {
+                            callback(null, "URL introuvable après upload")
                         }
-                        
-                        // Fermer les flux
-                        outputStream.flush()
-                        outputStream.close()
-                        inputStream.close()
-                        
-                        // Ajouter l'URI du fichier temporaire
-                        val fileUri = Uri.fromFile(tempFile)
-                        Log.d("AddProductActivity", "URI convertie: $fileUri")
-                        convertedUris.add(fileUri)
-                    } catch (e: Exception) {
-                        Log.e("AddProductActivity", "Erreur lors de la conversion de l'URI: ${e.message}", e)
-                        // En cas d'erreur, tenter d'utiliser l'URI originale
-                        convertedUris.add(uri)
-                    }
-                } else {
-                    Log.e("AddProductActivity", "Impossible d'ouvrir le flux pour: $uri")
-                    // Utiliser l'URI originale
-                    convertedUris.add(uri)
-                }
-            } catch (e: Exception) {
-                Log.e("AddProductActivity", "Erreur lors de la conversion de l'URI: ${e.message}", e)
-                // En cas d'erreur, utiliser l'URI originale
-                convertedUris.add(uri)
-            } finally {
-                remaining--
-                if (remaining == 0) {
-                    callback(convertedUris)
-                }
-            }
-        }
-    }
-    
-    private fun cleanupTempFiles() {
-        for (uri in tempImageUris) {
-            try {
-                if (uri.scheme == "file") {
-                    val path = uri.path
-                    if (path != null) {
-                        val file = File(path)
-                        if (file.exists() && file.isFile) {
-                            val deleted = file.delete()
-                            Log.d("AddProductActivity", "Fichier temporaire supprimé: $deleted - $path")
-                        }
+                        return@Thread
                     }
                 }
+
+                runOnUiThread {
+                    callback(urls, null)
+                }
+
             } catch (e: Exception) {
-                Log.e("AddProductActivity", "Erreur lors de la suppression du fichier temporaire: ${e.message}")
+                Log.e(TAG, "Erreur upload Cloudinary", e)
+                runOnUiThread {
+                    callback(null, e.message)
+                }
             }
-        }
-        tempImageUris.clear()
+        }.start()
     }
-    
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == STORAGE_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission accordée, relancer la soumission
-                submitProduct()
-            } else {
-                Toast.makeText(this, "Permission de stockage nécessaire pour envoyer des images", Toast.LENGTH_LONG).show()
-                binding.progressBar.visibility = View.GONE
-                binding.btnSubmit.isEnabled = true
-            }
-        }
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        // S'assurer que les fichiers temporaires sont supprimés
-        cleanupTempFiles()
+
+
+    private fun handleError(message: String) {
+        Log.e(TAG, message)
+        binding.progressBar.visibility = View.GONE
+        binding.btnSubmit.isEnabled = true
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 }
