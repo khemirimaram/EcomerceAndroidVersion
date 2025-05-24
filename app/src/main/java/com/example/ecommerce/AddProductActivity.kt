@@ -257,7 +257,7 @@ class AddProductActivity : AppCompatActivity() {
 
                 val urls = mutableListOf<String>()
 
-                // 🔽 Initialize Cloudinary using HashMap config
+                //cloudinary config
                 val config: HashMap<String, String> = HashMap()
                 config["cloud_name"] = "dhfckhxho"     // <- Replace this
                 config["api_secret"] = "eIt_X-J67PbzXTeA3ICA2KGLSGA"
