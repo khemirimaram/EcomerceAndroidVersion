@@ -1,6 +1,7 @@
 package com.example.ecommerce
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -9,19 +10,30 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.ChipGroup
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.DocumentSnapshot
 import com.example.ecommerce.adapters.ProductAdapter
 import com.example.ecommerce.databinding.ActivityMainBinding
 import com.example.ecommerce.models.Product
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.*
+import com.google.firebase.firestore.FirebaseFirestoreException
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -37,25 +49,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var searchEditText: EditText
     private lateinit var categoryChipGroup: ChipGroup
-    private lateinit var addProductFab: FloatingActionButton
 
     private var currentCategory: String = "Tous"
     private var currentQuery: String = ""
 
+    private val PRODUCTS_PER_PAGE = 10
+    private var lastLoadedProduct: DocumentSnapshot? = null
+    private var isLoadingMore = false
+    private var hasMoreProducts = true
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
+        
         try {
+            // Vérifier Google Play Services
+            if (!(application as ECommerceApp).checkGooglePlayServices(this)) {
+                Log.e(TAG, "Google Play Services n'est pas disponible")
+                return
+            }
+            
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+            
             // Initialize Firebase
             auth = FirebaseAuth.getInstance()
             firestore = FirebaseFirestore.getInstance()
-
-            // Test button for adding product
-            binding.addProductFab.setOnClickListener {
-                testAddProduct()
-            }
 
             // Initialize views
             initializeViews()
@@ -72,8 +94,9 @@ class MainActivity : AppCompatActivity() {
             // Load initial data
             loadProducts()
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error in onCreate: ${e.message}")
+            Log.e(TAG, "Erreur lors de l'initialisation de MainActivity", e)
             Toast.makeText(this, "Une erreur s'est produite", Toast.LENGTH_SHORT).show()
+            finish()
         }
     }
 
@@ -108,7 +131,6 @@ class MainActivity : AppCompatActivity() {
             swipeRefreshLayout = binding.swipeRefreshLayout
             searchEditText = binding.searchEditText
             categoryChipGroup = binding.categoryChipGroup
-            addProductFab = binding.addProductFab
         } catch (e: Exception) {
             Log.e("MainActivity", "Error initializing views: ${e.message}")
             throw e
@@ -146,20 +168,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 R.id.navigation_favorites -> {
                     if (checkAuthAndRedirect()) {
-                        // Naviguer vers les favoris
+                        startActivity(Intent(this, FavoritesActivity::class.java))
                         true
                     } else false
                 }
                 R.id.navigation_add -> {
                     if (checkAuthAndRedirect()) {
-                        // Naviguer vers l'ajout
                         startActivity(Intent(this, AddProductActivity::class.java))
                         true
                     } else false
                 }
                 R.id.navigation_messages -> {
                     if (checkAuthAndRedirect()) {
-                        // Naviguer vers les messages
+                        startActivity(Intent(this, com.example.ecommerce.ui.messages.MessagesActivity::class.java))
                         true
                     } else false
                 }
@@ -177,10 +198,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupRecyclerView() {
         productAdapter = ProductAdapter(
             onProductClick = { product ->
-                // Ouvrir les détails du produit
-                val intent = Intent(this, ProductDetailActivity::class.java)
-                intent.putExtra("PRODUCT_ID", product.id)
-                startActivity(intent)
+                startActivity(Intent(this, ProductDetailActivity::class.java).apply {
+                    putExtra("PRODUCT_ID", product.id)
+                })
             },
             onFavoriteClick = { product ->
                 if (auth.currentUser != null) {
@@ -191,9 +211,28 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        productsRecyclerView.apply {
+        binding.productsRecyclerView.apply {
             layoutManager = GridLayoutManager(this@MainActivity, 2)
             adapter = productAdapter
+            
+            // Add scroll listener for pagination
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    
+                    val layoutManager = recyclerView.layoutManager as GridLayoutManager
+                    val visibleItemCount = layoutManager.childCount
+                    val totalItemCount = layoutManager.itemCount
+                    val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+
+                    if (!isLoadingMore && hasMoreProducts) {
+                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
+                            && firstVisibleItemPosition >= 0) {
+                            loadProducts(isRefresh = false)
+                        }
+                    }
+                }
+            })
         }
 
         swipeRefreshLayout.setOnRefreshListener {
@@ -216,8 +255,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupCategoryFilter() {
-        categoryChipGroup.setOnCheckedChangeListener { group, checkedId ->
-            val chip = group.findViewById<View>(checkedId)
+        categoryChipGroup.setOnCheckedStateChangeListener { group, checkedIds ->
+            val checkedId = checkedIds.firstOrNull()
+            val chip = if (checkedId != null) group.findViewById<View>(checkedId) else null
             currentCategory = if (chip != null) {
                 (chip as? com.google.android.material.chip.Chip)?.text.toString()
             } else {
@@ -227,82 +267,140 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadProducts() {
-        try {
-            swipeRefreshLayout.isRefreshing = true
-            Log.d("MainActivity", "=== Début du chargement des produits ===")
-            Log.d("MainActivity", "État de Firestore: ${firestore != null}")
-            Log.d("MainActivity", "État de l'authentification: ${auth.currentUser?.uid ?: "Non connecté"}")
+    private fun getTimestampMillis(document: DocumentSnapshot, field: String): Long {
+        return try {
+            when (val timestamp = document.get(field)) {
+                is Long -> timestamp
+                is com.google.firebase.Timestamp -> timestamp.seconds * 1000 + timestamp.nanoseconds / 1000000
+                is java.util.Date -> timestamp.time
+                else -> {
+                    Log.w("MainActivity", "Format de timestamp non reconnu pour $field: $timestamp")
+                    System.currentTimeMillis()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Erreur lors de la conversion du timestamp pour $field", e)
+            System.currentTimeMillis()
+        }
+    }
 
-            // Requête simplifiée sans index composite
-            var query = if (currentCategory != "Tous") {
-                // Si une catégorie est sélectionnée, on filtre d'abord par catégorie
-                firestore.collection("produits")
-                    .whereEqualTo("categorie", currentCategory)
-            } else {
-                // Sinon, on trie juste par date
-                firestore.collection("produits")
+    private fun loadProducts(isRefresh: Boolean = true) {
+        try {
+            if (isRefresh) {
+                swipeRefreshLayout.isRefreshing = true
+                lastLoadedProduct = null
+                hasMoreProducts = true
+            }
+            
+            if (!hasMoreProducts || isLoadingMore) {
+                swipeRefreshLayout.isRefreshing = false
+                return
+            }
+
+            isLoadingMore = true
+            Log.d(TAG, "=== Début du chargement des produits ===")
+            
+            // Build base query - Simplified to avoid index issues
+            val productsRef = firestore.collection("produits")
+            var query = productsRef.orderBy("createdAt", Query.Direction.DESCENDING)
+            
+            // Apply category filter if needed
+            if (currentCategory != "Tous") {
+                query = productsRef.whereEqualTo("category", currentCategory)
                     .orderBy("createdAt", Query.Direction.DESCENDING)
             }
-
-            // Appliquer la recherche si nécessaire
+            
+            // Apply search filter if needed
             if (currentQuery.isNotEmpty()) {
-                query = query.whereArrayContains("motsCles", currentQuery.lowercase())
+                query = productsRef.whereArrayContains("searchKeywords", currentQuery.lowercase())
+                    .orderBy("createdAt", Query.Direction.DESCENDING)
+            }
+            
+            // Apply limit
+            query = query.limit(PRODUCTS_PER_PAGE.toLong())
+            
+            // Apply startAfter if not first page
+            if (lastLoadedProduct != null) {
+                query = query.startAfter(lastLoadedProduct!!)
             }
 
-            Log.d("MainActivity", "Exécution de la requête...")
-            query.get()
-                .addOnSuccessListener { documents ->
-                    Log.d("MainActivity", "=== Résultats de la requête ===")
-                    Log.d("MainActivity", "Nombre de documents reçus: ${documents.size()}")
-                    
-                    if (documents.isEmpty) {
-                        Log.d("MainActivity", "La collection est vide")
-                        binding.emptyView?.visibility = View.VISIBLE
-                        binding.productsRecyclerView.visibility = View.GONE
-                        swipeRefreshLayout.isRefreshing = false
-                        return@addOnSuccessListener
-                    }
-
-                    val products = documents.mapNotNull { document ->
-                        try {
-                            val product = document.toObject(Product::class.java)
-                            product?.copy(id = document.id)
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Erreur de conversion pour le document ${document.id}", e)
-                            null
+            query.get().addOnSuccessListener { documents ->
+                lifecycleScope.launch {
+                    try {
+                        // Update pagination state
+                        hasMoreProducts = documents.size() == PRODUCTS_PER_PAGE
+                        lastLoadedProduct = documents.lastOrNull()
+                        
+                        // Convert documents to products and filter active ones in memory
+                        val newProducts = documents.mapNotNull { doc ->
+                            try {
+                                val status = doc.getString("status") ?: "active"
+                                if (status != "active") return@mapNotNull null
+                                
+                                Product(
+                                    id = doc.id,
+                                    name = doc.getString("name") ?: "",
+                                    description = doc.getString("description") ?: "",
+                                    price = doc.getDouble("price") ?: 0.0,
+                                    quantity = doc.getLong("quantity")?.toInt() ?: 1,
+                                    category = doc.getString("category") ?: "",
+                                    condition = doc.getString("condition") ?: "",
+                                    images = when (val imagesData = doc.get("images")) {
+                                        is List<*> -> imagesData.filterIsInstance<String>()
+                                        is String -> listOf(imagesData)
+                                        else -> listOf()
+                                    },
+                                    sellerId = doc.getString("sellerId") ?: "",
+                                    sellerName = doc.getString("sellerName") ?: "",
+                                    sellerPhoto = doc.getString("sellerPhoto"),
+                                    createdAt = when (val timestamp = doc.get("createdAt")) {
+                                        is com.google.firebase.Timestamp -> timestamp.seconds * 1000
+                                        is Date -> timestamp.time
+                                        is Long -> timestamp
+                                        else -> System.currentTimeMillis()
+                                    },
+                                    status = status
+                                )
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error converting document ${doc.id}", e)
+                                null
+                            }
                         }
-                    }
 
-                    // Trier les résultats en mémoire si nécessaire
-                    val sortedProducts = if (currentCategory != "Tous") {
-                        products.sortedByDescending { it.createdAt }
-                    } else {
-                        products
-                    }
+                        // Update UI
+                        if (isRefresh) {
+                            if (newProducts.isEmpty()) {
+                                showEmptyState()
+                            } else {
+                                showProducts(newProducts)
+                            }
+                        } else {
+                            // Append new products to existing list
+                            val currentList = productAdapter.currentList.toMutableList()
+                            currentList.addAll(newProducts)
+                            showProducts(currentList)
+                        }
 
-                    productAdapter.submitList(sortedProducts)
-                    binding.emptyView?.visibility = if (sortedProducts.isEmpty()) View.VISIBLE else View.GONE
-                    binding.productsRecyclerView.visibility = if (sortedProducts.isEmpty()) View.GONE else View.VISIBLE
-                    swipeRefreshLayout.isRefreshing = false
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing products", e)
+                        showError("Erreur lors du chargement des produits")
+                    } finally {
+                        isLoadingMore = false
+                        swipeRefreshLayout.isRefreshing = false
+                    }
                 }
-                .addOnFailureListener { exception ->
-                    Log.e("MainActivity", "Erreur lors de la récupération des produits", exception)
-                    Log.e("MainActivity", "Message d'erreur: ${exception.message}")
-                    Log.e("MainActivity", "Cause: ${exception.cause}")
-                    Toast.makeText(this, "Erreur: ${exception.message}", Toast.LENGTH_SHORT).show()
-                    binding.emptyView?.visibility = View.VISIBLE
-                    binding.productsRecyclerView.visibility = View.GONE
-                    swipeRefreshLayout.isRefreshing = false
-                }
+            }.addOnFailureListener { e ->
+                Log.e(TAG, "Error loading products", e)
+                showError("Impossible de charger les produits")
+                isLoadingMore = false
+                swipeRefreshLayout.isRefreshing = false
+            }
+                
         } catch (e: Exception) {
-            Log.e("MainActivity", "Erreur critique dans loadProducts", e)
-            Log.e("MainActivity", "Message: ${e.message}")
-            Log.e("MainActivity", "Stack trace: ${e.stackTraceToString()}")
-            Toast.makeText(this, "Erreur critique: ${e.message}", Toast.LENGTH_LONG).show()
-            binding.emptyView?.visibility = View.VISIBLE
-            binding.productsRecyclerView.visibility = View.GONE
+            Log.e(TAG, "Error in loadProducts", e)
+            isLoadingMore = false
             swipeRefreshLayout.isRefreshing = false
+            Toast.makeText(this, "Une erreur s'est produite", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -341,13 +439,11 @@ class MainActivity : AppCompatActivity() {
                 userActionsContainer.visibility = View.GONE
                 profileIcon.visibility = View.VISIBLE
                 bottomNav.visibility = View.VISIBLE
-                addProductFab.show()
             } else {
                 // No user is signed in
                 userActionsContainer.visibility = View.VISIBLE
                 profileIcon.visibility = View.GONE
                 bottomNav.visibility = View.GONE
-                addProductFab.hide()
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error updating UI state: ${e.message}")
@@ -356,7 +452,6 @@ class MainActivity : AppCompatActivity() {
                 userActionsContainer.visibility = View.VISIBLE
                 profileIcon.visibility = View.GONE
                 bottomNav.visibility = View.GONE
-                addProductFab.hide()
             } catch (e2: Exception) {
                 Log.e("MainActivity", "Critical error updating UI state: ${e2.message}")
             }
@@ -371,29 +466,18 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    private fun testAddProduct() {
-        val testProduct = hashMapOf(
-            "title" to "Produit Test",
-            "description" to "Description du produit test",
-            "price" to 99.99,
-            "categorie" to "Test",
-            "dateCreation" to com.google.firebase.Timestamp.now(),
-            "motsCles" to listOf("test", "produit"),
-            "imageUrl" to "",
-            "sellerName" to "Test Vendeur",
-            "location" to "Test Location"
-        )
+    private fun showEmptyState() {
+        binding.emptyView.visibility = View.VISIBLE
+        binding.productsRecyclerView.visibility = View.GONE
+    }
 
-        firestore.collection("produits")
-            .add(testProduct)
-            .addOnSuccessListener { documentReference ->
-                Log.d("MainActivity", "Produit test ajouté avec ID: ${documentReference.id}")
-                Toast.makeText(this, "Produit test ajouté avec succès", Toast.LENGTH_SHORT).show()
-                loadProducts() // Recharger les produits
-            }
-            .addOnFailureListener { e ->
-                Log.e("MainActivity", "Erreur lors de l'ajout du produit test", e)
-                Toast.makeText(this, "Erreur: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+    private fun showProducts(products: List<Product>) {
+        binding.emptyView.visibility = View.GONE
+        binding.productsRecyclerView.visibility = View.VISIBLE
+        productAdapter.submitList(products)
+    }
+
+    private fun showError(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }

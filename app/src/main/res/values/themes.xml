@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.Ecommerce" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">@color/design_default_color_primary</item>
-        <item name="colorPrimaryVariant">@color/design_default_color_primary_variant</item>
+    <style name="Theme.Ecommerce" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary_blue</item>
+        <item name="colorPrimaryVariant">@color/primary_dark_blue</item>
         <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/design_default_color_secondary</item>
-        <item name="colorSecondaryVariant">@color/design_default_color_secondary_variant</item>
+        <item name="colorSecondary">@color/accent_color</item>
+        <item name="colorSecondaryVariant">@color/accent_dark_color</item>
         <item name="colorOnSecondary">@color/black</item>
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -19,7 +19,15 @@
         <item name="android:statusBarColor">@color/background_white</item>
     </style>
 
-    <style name="Theme.Ecommerce.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <style name="Theme.Ecommerce.AppBarOverlay" parent="ThemeOverlay.Material3.Dark.ActionBar" />
 
-    <style name="Theme.Ecommerce.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+    <style name="Theme.Ecommerce.PopupOverlay" parent="ThemeOverlay.Material3.Light" />
+
+    <!-- Search theme overlay -->
+    <style name="ThemeOverlay.Material3.Search" parent="ThemeOverlay.Material3.AutoCompleteTextView">
+        <item name="colorSurfaceVariant">@color/white</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/black</item>
+        <item name="colorOnSurfaceVariant">@color/text_gray</item>
+    </style>
 </resources>

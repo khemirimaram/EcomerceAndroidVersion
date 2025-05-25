@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Votre note:"
+        android:text="@string/your_rating"
         android:textStyle="bold"
         android:textSize="16sp"
         android:layout_marginBottom="8dp"/>
@@ -28,7 +28,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Votre commentaire:"
+        android:text="@string/your_comment"
         android:textStyle="bold"
         android:textSize="16sp"
         android:layout_marginBottom="8dp"/>
@@ -37,7 +37,7 @@
         android:id="@+id/etComment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Partagez votre expérience avec ce vendeur..."
+        android:hint="@string/share_experience"
         android:inputType="textMultiLine"
         android:minLines="3"
         android:gravity="top"

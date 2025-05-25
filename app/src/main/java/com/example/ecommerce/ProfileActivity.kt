@@ -8,453 +8,291 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.ecommerce.adapters.ProductAdapter
+import com.example.ecommerce.adapters.ReviewAdapter
 import com.example.ecommerce.databinding.ActivityProfileBinding
+import com.example.ecommerce.models.Product
+import com.example.ecommerce.models.Review
 import com.example.ecommerce.models.User
+import com.example.ecommerce.repositories.ReviewRepository
+import com.example.ecommerce.ui.ProductDetailsActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import de.hdodenhof.circleimageview.CircleImageView
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 
 class ProfileActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileBinding
+    private lateinit var productAdapter: ProductAdapter
+    private lateinit var reviewAdapter: ReviewAdapter
+    private lateinit var reviewRepository: ReviewRepository
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val TAG = "ProfileActivity"
     
-    private var userId: String = ""
+    private var userId: String? = null
     private var currentUser: User? = null
+    private var loadProfileJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ActivityProfileBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         
-        try {
-            Log.d(TAG, "1. Début de onCreate")
-            
-            // Initialiser le binding
-            binding = ActivityProfileBinding.inflate(layoutInflater)
-            Log.d(TAG, "2. Binding initialisé")
-            
-            setContentView(binding.root)
-            Log.d(TAG, "3. setContentView appelé")
+        Log.d(TAG, "ProfileActivity onCreate")
+        
+        setupToolbar()
+        setupAdapters()
+        setupRecyclerViews()
+        
+        // Get user ID from intent or current user
+        userId = intent.getStringExtra("USER_ID")
+        Log.d(TAG, "Received USER_ID from intent: $userId")
+        
+        if (userId == null) {
+            userId = auth.currentUser?.uid
+            Log.d(TAG, "Using current user ID as fallback: $userId")
+        }
+        
+        if (userId == null) {
+            Log.e(TAG, "No user ID available")
+            showLoginRequired()
+            return
+        }
+        
+        loadUserProfile()
+    }
 
-            // Configurer immédiatement le bouton de déconnexion
-            try {
-                binding.logoutButton.setOnClickListener {
-                    showLogoutConfirmationDialog()
-                }
-                binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
-                Log.d(TAG, "Bouton de déconnexion configuré")
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur lors de la configuration du bouton de déconnexion: ${e.message}")
-            }
-            
-            // Masquer immédiatement la section produits
-            hideProductSection()
-            
-            // Vérifier l'état de l'authentification
-            val firebaseUser = auth.currentUser
-            Log.d(TAG, "Auth currentUser: ${firebaseUser?.uid}, isConnected: ${firebaseUser != null}")
-            
-            // Récupérer l'ID utilisateur
-            userId = intent.getStringExtra("USER_ID") ?: firebaseUser?.uid ?: ""
-            Log.d(TAG, "4. ID utilisateur récupéré: $userId")
-            
-            // Bouton retour
-            try {
-                binding.ivBack.setOnClickListener {
-                    finish()
-                }
-                Log.d(TAG, "5. Bouton retour configuré")
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur sur le bouton retour: ${e.message}")
-            }
-            
-            // Si pas d'utilisateur connecté, essayer de récupérer l'ID de Firebase
-            if (userId.isEmpty() && firebaseUser != null) {
-                userId = firebaseUser.uid
-                Log.d(TAG, "Utilisateur trouvé dans Firebase: $userId")
-            }
-            
-            // Si toujours pas d'ID, afficher profil par défaut
-            if (userId.isEmpty()) {
-                Log.e(TAG, "Utilisateur non connecté - affichage profil par défaut")
-                setupDefaultProfile()
-                return
-            }
-
-            Log.d(TAG, "Utilisateur connecté avec ID: $userId - chargement du profil")
-            
-            // Charger le profil utilisateur
-            loadUserProfile()
-            
-            // Configurer les autres boutons
-            setupButtons()
-            
-            Log.d(TAG, "6. ProfileActivity onCreate terminé")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur globale dans ProfileActivity: ${e.message}")
-            e.printStackTrace()
-            
-            // S'assurer que le bouton de déconnexion est visible si l'utilisateur est connecté
-            try {
-                binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur lors de la configuration du bouton de déconnexion: ${e.message}")
-            }
-            
-            // Afficher un message d'erreur à l'utilisateur
-            Toast.makeText(this, "Erreur lors du chargement du profil: ${e.message}", Toast.LENGTH_LONG).show()
+    private fun setupToolbar() {
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayShowHomeEnabled(true)
+        
+        binding.ivBack.setOnClickListener {
+            finish()
         }
     }
     
-    private fun setupDefaultProfile() {
-        try {
-            Log.d(TAG, "Configuration du profil par défaut")
-            
-            // Informations de base
-            binding.tvUsername.text = "Utilisateur non connecté"
-            binding.tvRating.text = "N/A"
-            binding.tvReviewCount.text = "0 avis"
-            binding.tvProductCount.text = "0 annonce"
-            binding.profileImage.setImageResource(R.drawable.ic_person)
-            
-            // Masquer les boutons d'interaction
-            binding.btnEditProfile.visibility = View.GONE
-            binding.tvLeaveReview.visibility = View.GONE
-            binding.btnSendMessage.visibility = View.GONE
-            
-            // Masquer les sections produits
-            hideProductSection()
-            
-            // Vérifier à nouveau si l'utilisateur est connecté pour l'inviter à se connecter
-            if (auth.currentUser != null) {
-                Toast.makeText(this, "Erreur lors du chargement de votre profil", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Connectez-vous pour voir votre profil", Toast.LENGTH_SHORT).show()
+    private fun setupAdapters() {
+        productAdapter = ProductAdapter(
+            onProductClick = { product ->
+                startActivity(Intent(this, ProductDetailsActivity::class.java).apply {
+                    putExtra("PRODUCT_ID", product.id)
+                })
+            },
+            onFavoriteClick = { product ->
+                // TODO: Implement favorite functionality
+                Toast.makeText(this, getString(R.string.coming_soon), Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur dans setupDefaultProfile: ${e.message}")
+        )
+        reviewAdapter = ReviewAdapter()
+        reviewRepository = ReviewRepository()
+    }
+    
+    private fun setupRecyclerViews() {
+        binding.productsRecyclerView.apply {
+            layoutManager = GridLayoutManager(this@ProfileActivity, 2)
+            adapter = productAdapter
         }
+        
+        binding.reviewsRecyclerView.apply {
+            layoutManager = LinearLayoutManager(this@ProfileActivity)
+            adapter = reviewAdapter
+        }
+    }
+
+    private fun updateProfileUI(user: User) {
+        binding.apply {
+            tvUsername.text = user.username
+            
+            // Show/hide action buttons based on whether this is the current user's profile
+            val isCurrentUser = auth.currentUser?.uid == userId
+            btnEditProfile.visibility = if (isCurrentUser) View.VISIBLE else View.GONE
+            
+            // Set click listeners
+            btnEditProfile.setOnClickListener {
+                startActivityForResult(
+                    Intent(this@ProfileActivity, EditProfileActivity::class.java),
+                    REQUEST_EDIT_PROFILE
+                )
+            }
+            
+            btnLogout.setOnClickListener {
+                auth.signOut()
+                startActivity(Intent(this@ProfileActivity, LoginActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                })
+                finish()
+            }
+        }
+    }
+
+    private fun showLoginRequired() {
+        binding.apply {
+            contentLayout.visibility = View.GONE
+            emptyProductsView.visibility = View.VISIBLE
+            emptyReviewsView.visibility = View.VISIBLE
+            btnEditProfile.visibility = View.GONE
+        }
+        
+        Toast.makeText(this, getString(R.string.login_required), Toast.LENGTH_LONG).show()
+        
+        // Redirect to login after delay
+        binding.root.postDelayed({
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        }, 1500)
     }
 
     private fun loadUserProfile() {
-        try {
-            Log.d(TAG, "Chargement du profil utilisateur: $userId")
-            
-            firestore.collection("users")
-                .document(userId)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        try {
-                            Log.d(TAG, "Document utilisateur trouvé: ${document.data}")
-                            currentUser = document.toObject(User::class.java)
-                            
-                            if (currentUser != null) {
-                                Log.d(TAG, "Utilisateur convertit avec succès: ${currentUser?.username}")
-                                updateUI(currentUser)
-                            } else {
-                                Log.e(TAG, "Erreur: conversion en User a renvoyé null")
-                                createUserProfileIfNeeded()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Erreur lors de la conversion des données: ${e.message}")
-                            createUserProfileIfNeeded()
+        showLoadingState()
+        
+        loadProfileJob?.cancel()
+        loadProfileJob = lifecycleScope.launch {
+            try {
+                val userDoc = firestore.collection("users")
+                    .document(userId!!)
+                    .get()
+                    .await()
+                
+                if (!userDoc.exists()) {
+                    showError(getString(R.string.user_not_found))
+                    return@launch
+                }
+                
+                currentUser = userDoc.toObject(User::class.java)
+                currentUser?.let { user ->
+                    updateProfileUI(user)
+                    
+                    // Load products and reviews in parallel
+                    val productsDeferred = async { loadUserProducts() }
+                    val reviewsDeferred = async { loadUserReviews() }
+                    val ratingDeferred = async { reviewRepository.getSellerRating(userId!!) }
+                    
+                    try {
+                        val products = productsDeferred.await()
+                        updateProductsUI(products)
+                        
+                        val reviews = reviewsDeferred.await()
+                        updateReviewsUI(reviews)
+                        
+                        ratingDeferred.await().onSuccess { ratingInfo ->
+                            updateRatingUI(ratingInfo.averageRating, ratingInfo.numberOfRatings)
                         }
-                    } else {
-                        Log.d(TAG, "Document utilisateur non trouvé - création d'un nouveau profil")
-                        createUserProfileIfNeeded()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading user data", e)
+                        showError(getString(R.string.error_loading_data))
                     }
                 }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Erreur lors du chargement: ${e.message}")
-                    createUserProfileIfNeeded()
-                }
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur dans loadUserProfile: ${e.message}")
-            setupDefaultProfile()
+                
+                hideLoadingState()
+                
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Log.e(TAG, "Error in loadUserProfile", e)
+                showError(getString(R.string.error_loading_profile))
+            }
         }
     }
     
-    private fun createUserProfileIfNeeded() {
-        // Si l'utilisateur est connecté mais n'a pas de profil, créer un profil de base
-        val firebaseUser = auth.currentUser
-        if (firebaseUser != null) {
-            try {
-                Log.d(TAG, "Création d'un nouveau profil utilisateur")
-                
-                // Assigner un avatar aléatoire (0-5)
-                val randomAvatarId = (0..5).random()
-                Log.d(TAG, "Avatar aléatoire assigné: $randomAvatarId")
-                
-                val newUser = User(
-                    id = firebaseUser.uid,
-                    email = firebaseUser.email,
-                    username = firebaseUser.displayName ?: "Utilisateur",
-                    firstName = firebaseUser.displayName?.split(" ")?.getOrNull(0) ?: "",
-                    lastName = firebaseUser.displayName?.split(" ")?.getOrNull(1) ?: "",
-                    profileImageUrl = null, // Pas besoin d'URL d'image car nous utilisons des avatars
-                    avatarId = randomAvatarId, // Assigner l'avatar aléatoire
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                )
-                
-                // Sauvegarder le nouveau profil
-                firestore.collection("users")
-                    .document(firebaseUser.uid)
-                    .set(newUser)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Nouveau profil créé avec succès")
-                        currentUser = newUser
-                        updateUI(newUser)
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "Erreur lors de la création du profil: ${e.message}")
-                        setupDefaultProfile()
-                    }
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur lors de la création du profil: ${e.message}")
-                setupDefaultProfile()
-            }
-        } else {
-            Log.d(TAG, "Aucun utilisateur connecté, impossible de créer un profil")
-            setupDefaultProfile()
+    private fun updateRatingUI(rating: Float, reviewCount: Int) {
+        binding.apply {
+            tvRating.text = String.format("%.1f", rating)
+            tvReviewCount.text = resources.getQuantityString(
+                R.plurals.review_count,
+                reviewCount,
+                reviewCount
+            )
         }
     }
     
-    private fun updateUI(user: User?) {
-        try {
-            if (user == null) {
-                Log.d(TAG, "Utilisateur null dans updateUI")
-                setupDefaultProfile()
-                return
-            }
-
-            Log.d(TAG, "Mise à jour de l'UI avec les données utilisateur: ${user.username}")
-            
-            // Nom d'utilisateur
-            binding.tvUsername.text = user.username ?: user.firstName ?: "Utilisateur"
-            
-            // Photo de profil - Utilisation du système d'avatars
-            try {
-                // Charger l'avatar en fonction de l'ID
-                val avatarResourceId = when(user.avatarId) {
-                    1 -> R.drawable.avatar_default_1
-                    2 -> R.drawable.avatar_default_2
-                    3 -> R.drawable.avatar_default_3
-                    4 -> R.drawable.avatar_default_4
-                    5 -> R.drawable.avatar_default_5
-                    else -> R.drawable.ic_person // Avatar par défaut (0)
-                }
-                
-                // Appliquer l'avatar
-                binding.profileImage.setImageResource(avatarResourceId)
-                
-                Log.d(TAG, "Avatar chargé avec succès: ID=${user.avatarId}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur lors du chargement de l'avatar: ${e.message}")
-                binding.profileImage.setImageResource(R.drawable.ic_person)
-            }
-            
-            // Pour le moment, afficher des valeurs par défaut pour les autres informations
-            binding.tvRating.text = "N/A"
-            binding.tvReviewCount.text = "0 avis"
-            binding.tvProductCount.text = "0 annonce"
-            
-            // Masquer les sections produits
-            hideProductSection()
-            
-            // Gérer la visibilité des boutons
-            if (userId == auth.currentUser?.uid) {
-                // C'est le profil de l'utilisateur connecté
-                binding.btnEditProfile.visibility = View.VISIBLE
-                binding.tvLeaveReview.visibility = View.GONE
-                binding.btnSendMessage.visibility = View.GONE
-                binding.logoutButton.visibility = View.VISIBLE
+    private suspend fun loadUserProducts(): List<Product> {
+        return firestore.collection("products")
+            .whereEqualTo("sellerId", userId)
+            .get()
+            .await()
+            .toObjects(Product::class.java)
+    }
+    
+    private fun updateProductsUI(products: List<Product>) {
+        binding.apply {
+            if (products.isEmpty()) {
+                productsRecyclerView.visibility = View.GONE
+                emptyProductsView.visibility = View.VISIBLE
             } else {
-                // C'est le profil d'un autre utilisateur
-                binding.btnEditProfile.visibility = View.GONE
-                binding.tvLeaveReview.visibility = View.VISIBLE
-                binding.btnSendMessage.visibility = View.VISIBLE
-                binding.logoutButton.visibility = View.GONE
+                productsRecyclerView.visibility = View.VISIBLE
+                emptyProductsView.visibility = View.GONE
+                productAdapter.submitList(products)
+                tvProductCount.text = resources.getQuantityString(
+                    R.plurals.product_count,
+                    products.size,
+                    products.size
+                )
             }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur dans updateUI: ${e.message}")
-            binding.profileImage.setImageResource(R.drawable.ic_person)
-            // En cas d'erreur, on affiche quand même le bouton de déconnexion si l'utilisateur est connecté
-            binding.logoutButton.visibility = if (auth.currentUser != null) View.VISIBLE else View.GONE
         }
     }
     
-    private fun setupButtons() {
-        try {
-            // Modifier profil - uniquement pour le propriétaire du profil
-            binding.btnEditProfile.setOnClickListener {
-                try {
-                    if (userId == auth.currentUser?.uid) {
-                        val intent = Intent(this, EditProfileActivity::class.java)
-                        startActivity(intent)
-                    } else {
-                        Toast.makeText(this, "Vous ne pouvez pas modifier ce profil", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Erreur lors du clic sur modifier profil: ${e.message}")
-                    Toast.makeText(this, "Erreur: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            
-            // Laisser un avis - uniquement si ce n'est pas son propre profil
-            binding.tvLeaveReview.setOnClickListener {
-                try {
-                    if (userId != auth.currentUser?.uid) {
-                        // Implémentation temporaire - juste un message
-                        Toast.makeText(this, "Fonctionnalité 'Laisser un avis' à venir", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "Vous ne pouvez pas laisser un avis sur votre propre profil", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Erreur lors du clic sur laisser un avis: ${e.message}")
-                }
-            }
-            
-            // Envoyer un message
-            binding.btnSendMessage.setOnClickListener {
-                try {
-                    // Implémentation temporaire - juste un message
-                    Toast.makeText(this, "Fonctionnalité 'Envoyer un message' à venir", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Erreur lors du clic sur envoyer un message: ${e.message}")
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur dans setupButtons: ${e.message}")
-        }
+    private suspend fun loadUserReviews(): List<Review> {
+        return firestore.collection("reviews")
+            .whereEqualTo("sellerId", userId)
+            .get()
+            .await()
+            .toObjects(Review::class.java)
     }
     
-    // Méthode pour gérer le retour du EditProfileActivity
-    override fun onResume() {
-        super.onResume()
-        
-        Log.d(TAG, "onResume appelé")
-        
-        // Recharger le profil utilisateur à chaque retour à cette activité
-        if (userId.isNotEmpty()) {
-            Log.d(TAG, "Rechargement du profil utilisateur (ID: $userId)")
-            loadUserProfile()
-        } else if (auth.currentUser != null) {
-            // Si userId est vide mais que l'utilisateur est connecté, récupérer l'ID depuis Firebase
-            userId = auth.currentUser!!.uid
-            Log.d(TAG, "ID utilisateur récupéré de Firebase Auth: $userId")
-            loadUserProfile()
-        } else {
-            Log.d(TAG, "Aucun utilisateur connecté dans onResume")
+    private fun updateReviewsUI(reviews: List<Review>) {
+        binding.apply {
+            if (reviews.isEmpty()) {
+                reviewsRecyclerView.visibility = View.GONE
+                emptyReviewsView.visibility = View.VISIBLE
+            } else {
+                reviewsRecyclerView.visibility = View.VISIBLE
+                emptyReviewsView.visibility = View.GONE
+                reviewAdapter.submitList(reviews)
+            }
         }
     }
-    
-    // Recevoir le résultat de l'activité de modification de profil
+
+    private fun showLoadingState() {
+        binding.apply {
+            progressBar.visibility = View.VISIBLE
+            contentLayout.alpha = 0.5f
+            contentLayout.isEnabled = false
+        }
+    }
+
+    private fun hideLoadingState() {
+        binding.apply {
+            progressBar.visibility = View.GONE
+            contentLayout.alpha = 1.0f
+            contentLayout.isEnabled = true
+        }
+    }
+
+    private fun showError(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
-        if (resultCode == Activity.RESULT_OK) {
-            Log.d(TAG, "Retour de l'activité de modification de profil avec succès")
-            // Recharger immédiatement le profil
+        if (requestCode == REQUEST_EDIT_PROFILE && resultCode == Activity.RESULT_OK) {
             loadUserProfile()
         }
     }
 
-    // Nouvelle méthode pour masquer tous les éléments liés aux produits
-    private fun hideProductSection() {
-        try {
-            // Masquer les cards de produits
-            binding.cardProduct1?.visibility = View.GONE
-            binding.cardProduct2?.visibility = View.GONE
-            binding.cardProduct3?.visibility = View.GONE
-            binding.cardProduct4?.visibility = View.GONE
-            
-            // Masquer également le titre de la section produits
-            binding.tvProductSectionTitle?.visibility = View.GONE
-            
-            // Masquer les rangées de produits
-            binding.productRowLayout1?.visibility = View.GONE
-            binding.productRowLayout2?.visibility = View.GONE
-            
-            Log.d(TAG, "Section produits masquée avec succès")
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur lors de la suppression des produits: ${e.message}")
-        }
+    override fun onPause() {
+        super.onPause()
+        loadProfileJob?.cancel()
     }
-
-    private fun showLogoutConfirmationDialog() {
-        try {
-            AlertDialog.Builder(this)
-                .setTitle("Déconnexion")
-                .setMessage("Êtes-vous sûr de vouloir vous déconnecter ?")
-                .setPositiveButton("Oui") { dialog, _ ->
-                    try {
-                        logout()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Erreur lors de la déconnexion: ${e.message}")
-                        Toast.makeText(this, "Erreur lors de la déconnexion", Toast.LENGTH_SHORT).show()
-                    }
-                    dialog.dismiss()
-                }
-                .setNegativeButton("Non") { dialog, _ ->
-                    dialog.dismiss()
-                }
-                .setCancelable(true)
-                .create()
-                .show()
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur lors de l'affichage du dialogue de déconnexion: ${e.message}")
-            // En cas d'erreur, on essaie quand même de déconnecter
-            logout()
-        }
-    }
-
-    private fun logout() {
-        try {
-            // Vérifier si l'utilisateur est connecté
-            if (auth.currentUser == null) {
-                Log.w(TAG, "Tentative de déconnexion alors qu'aucun utilisateur n'est connecté")
-                redirectToMain()
-                return
-            }
-
-            // Déconnexion de Firebase
-            auth.signOut()
-            Log.d(TAG, "Utilisateur déconnecté avec succès")
-
-            // Redirection vers MainActivity
-            redirectToMain()
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur lors de la déconnexion: ${e.message}")
-            e.printStackTrace()
-            // Même en cas d'erreur, on essaie de rediriger
-            redirectToMain()
-        }
-    }
-
-    private fun redirectToMain() {
-        try {
-            // Créer l'intent pour MainActivity
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-            
-            // Démarrer MainActivity
-            startActivity(intent)
-            
-            // Fermer l'activité actuelle
-            finish()
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur lors de la redirection vers MainActivity: ${e.message}")
-            e.printStackTrace()
-            // En dernier recours, on essaie juste de fermer l'activité
-            finish()
-        }
+    
+    companion object {
+        private const val REQUEST_EDIT_PROFILE = 100
     }
 } 

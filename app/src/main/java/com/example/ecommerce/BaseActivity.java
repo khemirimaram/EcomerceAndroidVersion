@@ -23,11 +23,8 @@ public class BaseActivity extends AppCompatActivity {
             } else if (itemId == R.id.navigation_favorites) {
                 // TODO: Navigate to favorites
                 return true;
-            } else if (itemId == R.id.navigation_add) {
-                // TODO: Navigate to add product
-                return true;
             } else if (itemId == R.id.navigation_messages) {
-                // TODO: Navigate to messages
+                startActivity(new Intent(this, com.example.ecommerce.ui.messages.MessagesActivity.class));
                 return true;
             } else if (itemId == R.id.navigation_profile) {
                 // TODO: Navigate to profile

@@ -4,6 +4,7 @@ import android.graphics.drawable.Drawable
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.View
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -39,9 +40,8 @@ class ProductAdapter(
     }
 
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
-        val item = getItem(position)
-        Log.d("ProductAdapter", "Binding item at position $position: ${item.id}")
-        holder.bind(item)
+        val product = getItem(position)
+        holder.bind(product)
     }
 
     override fun submitList(list: List<Product>?) {
@@ -50,7 +50,7 @@ class ProductAdapter(
     }
 
     inner class ProductViewHolder(
-        private val binding: ItemProductGridBinding
+        val binding: ItemProductGridBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {
@@ -70,49 +70,34 @@ class ProductAdapter(
         }
 
         fun bind(product: Product) {
-            Log.d("ProductAdapter", "=== Binding product ===")
-            Log.d("ProductAdapter", "ID: ${product.id}")
-            Log.d("ProductAdapter", "Titre: ${product.title}")
-            Log.d("ProductAdapter", "Prix: ${product.price}")
-            Log.d("ProductAdapter", "Image URL: ${product.images.firstOrNull()}")
-            
             binding.apply {
-                productTitle.text = product.title
-                productDescription.text = product.description
+                productTitle.text = product.name
                 productPrice.text = formatPrice(product.price)
-                productLocation.text = product.location
-                sellerInfo.text = product.sellerName
-                newBadge.isVisible = product.isNew
-                
                 favoriteButton.setImageResource(
                     if (product.isFavorite) R.drawable.ic_favorite
                     else R.drawable.ic_favorite_border
                 )
 
-                // Charger l'image avec gestion d'erreur
+                exchangeInfo.apply {
+                    visibility = if (product.isAvailableForExchange == true) View.VISIBLE else View.GONE
+                    text = if (product.exchangePreferences?.isNotEmpty() == true) {
+                        "Échange souhaité: ${product.exchangePreferences}"
+                    } else {
+                        "Disponible pour échange"
+                    }
+                    setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_swap_horiz, 0, 0, 0)
+                }
+                
                 try {
                     val imageUrl = product.images.firstOrNull()
                     if (!imageUrl.isNullOrEmpty()) {
-                        Log.d("ProductAdapter", "Loading image: $imageUrl")
                         Glide.with(productImage)
                             .load(imageUrl)
                             .placeholder(R.drawable.placeholder_image)
                             .error(R.drawable.error_image)
-                            .listener(object : RequestListener<Drawable> {
-                                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
-                                    Log.e("ProductAdapter", "Image load failed for ${product.id}: ${e?.message}")
-                                    return false
-                                }
-
-                                override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
-                                    Log.d("ProductAdapter", "Image loaded successfully for ${product.id}")
-                                    return false
-                                }
-                            })
                             .centerCrop()
                             .into(productImage)
                     } else {
-                        Log.w("ProductAdapter", "Empty image URL for product ${product.id}")
                         productImage.setImageResource(R.drawable.placeholder_image)
                     }
                 } catch (e: Exception) {
@@ -123,8 +108,13 @@ class ProductAdapter(
         }
 
         private fun formatPrice(price: Double): String {
-            return NumberFormat.getCurrencyInstance(Locale.FRANCE).format(price)
+            return String.format("%.2f DT", price)
         }
+    }
+
+    private fun isProductNew(createdAt: Long): Boolean {
+        val sevenDaysInMillis = 7 * 24 * 60 * 60 * 1000L
+        return System.currentTimeMillis() - createdAt < sevenDaysInMillis
     }
 
     private class ProductDiffCallback : DiffUtil.ItemCallback<Product>() {

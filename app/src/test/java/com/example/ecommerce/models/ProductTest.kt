@@ -12,7 +12,7 @@ class ProductTest {
         
         val product = Product(
             id = "123",
-            title = "Test Product",
+            name = "Test Product",
             description = "Test Description",
             price = 99.99,
             images = images,
@@ -20,13 +20,12 @@ class ProductTest {
             sellerId = "seller123",
             sellerName = "John Doe",
             condition = "New",
-            location = "Paris",
             createdAt = currentTime,
-            updatedAt = currentTime
+            status = "active"
         )
         
         assertThat(product.id).isEqualTo("123")
-        assertThat(product.title).isEqualTo("Test Product")
+        assertThat(product.name).isEqualTo("Test Product")
         assertThat(product.description).isEqualTo("Test Description")
         assertThat(product.price).isEqualTo(99.99)
         assertThat(product.images).containsExactlyElementsIn(images)
@@ -34,9 +33,8 @@ class ProductTest {
         assertThat(product.sellerId).isEqualTo("seller123")
         assertThat(product.sellerName).isEqualTo("John Doe")
         assertThat(product.condition).isEqualTo("New")
-        assertThat(product.location).isEqualTo("Paris")
         assertThat(product.createdAt).isEqualTo(currentTime)
-        assertThat(product.updatedAt).isEqualTo(currentTime)
+        assertThat(product.status).isEqualTo("active")
     }
     
     @Test
@@ -51,7 +49,7 @@ class ProductTest {
             price = 99.99,
             category = "Electronics",
             condition = "New",
-            sellerUserId = "seller123",
+            sellerId = "seller123",
             sellerName = "John Doe",
             location = "Paris",
             images = images,
@@ -60,7 +58,7 @@ class ProductTest {
         )
         
         assertThat(product.id).isEqualTo("123")
-        assertThat(product.title).isEqualTo("Test Product")
+        assertThat(product.name).isEqualTo("Test Product")
         assertThat(product.description).isEqualTo("Test Description")
         assertThat(product.price).isEqualTo(99.99)
         assertThat(product.images).containsExactlyElementsIn(images)
@@ -90,7 +88,7 @@ class ProductTest {
         val product = Product()
         
         assertThat(product.id).isEmpty()
-        assertThat(product.title).isEmpty()
+        assertThat(product.name).isEmpty()
         assertThat(product.description).isEmpty()
         assertThat(product.price).isEqualTo(0.0)
         assertThat(product.images).isEmpty()
@@ -98,7 +96,23 @@ class ProductTest {
         assertThat(product.sellerId).isEmpty()
         assertThat(product.sellerName).isEmpty()
         assertThat(product.condition).isEmpty()
-        assertThat(product.location).isEmpty()
+        assertThat(product.status).isEqualTo("active")
         assertThat(product.isFavorite).isFalse()
+    }
+    
+    @Test
+    fun `test product status constants`() {
+        assertThat(Product.STATUS_ACTIVE).isEqualTo("active")
+        assertThat(Product.STATUS_SOLD).isEqualTo("sold")
+        assertThat(Product.STATUS_ARCHIVED).isEqualTo("archived")
+    }
+    
+    @Test
+    fun `test product condition constants`() {
+        assertThat(Product.CONDITION_NEW).isEqualTo("new")
+        assertThat(Product.CONDITION_LIKE_NEW).isEqualTo("likeNew")
+        assertThat(Product.CONDITION_GOOD).isEqualTo("good")
+        assertThat(Product.CONDITION_FAIR).isEqualTo("fair")
+        assertThat(Product.CONDITION_POOR).isEqualTo("poor")
     }
 } 

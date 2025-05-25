@@ -126,15 +126,31 @@ object FirebaseManager {
      */
     suspend fun getAllProducts(): List<Product> {
         return try {
-            val snapshot = db.collection(PRODUCTS_COLLECTION)
+            val snapshot = db.collection("products")
+                .whereEqualTo("status", "available")
+                .whereEqualTo("visibility", "public")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
             snapshot.documents.mapNotNull { document ->
                 try {
-                    document.toObject(Product::class.java)?.copy(
-                        id = document.id
+                    Product(
+                        id = document.id,
+                        name = document.getString("name") ?: "",
+                        description = document.getString("description") ?: "",
+                        price = document.getDouble("price") ?: 0.0,
+                        quantity = document.getLong("quantity")?.toInt() ?: 1,
+                        category = document.getString("category") ?: "",
+                        condition = document.getString("condition") ?: "",
+                        images = (document.get("images") as? List<*>)?.filterIsInstance<String>() ?: listOf(),
+                        sellerId = document.getString("sellerId") ?: "",
+                        sellerName = document.getString("sellerName") ?: "",
+                        sellerPhoto = document.getString("sellerPhoto"),
+                        isAvailableForExchange = document.getBoolean("isAvailableForExchange") ?: false,
+                        exchangePreferences = document.getString("exchangePreferences"),
+                        createdAt = document.getLong("createdAt") ?: System.currentTimeMillis(),
+                        status = document.getString("status") ?: "active"
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Erreur lors de la conversion du document", e)
@@ -152,16 +168,37 @@ object FirebaseManager {
      */
     suspend fun getProductsByCategory(category: String): List<Product> {
         return try {
-            val snapshot = db.collection("produits")
+            val snapshot = db.collection("products")
                 .whereEqualTo("category", category)
+                .whereEqualTo("status", "available")
+                .whereEqualTo("visibility", "public")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
             snapshot.documents.mapNotNull { document ->
-                document.toObject(Product::class.java)?.copy(
-                    id = document.id
-                )
+                try {
+                    Product(
+                        id = document.id,
+                        name = document.getString("name") ?: "",
+                        description = document.getString("description") ?: "",
+                        price = document.getDouble("price") ?: 0.0,
+                        quantity = document.getLong("quantity")?.toInt() ?: 1,
+                        category = document.getString("category") ?: "",
+                        condition = document.getString("condition") ?: "",
+                        images = (document.get("images") as? List<*>)?.filterIsInstance<String>() ?: listOf(),
+                        sellerId = document.getString("sellerId") ?: "",
+                        sellerName = document.getString("sellerName") ?: "",
+                        sellerPhoto = document.getString("sellerPhoto"),
+                        isAvailableForExchange = document.getBoolean("isAvailableForExchange") ?: false,
+                        exchangePreferences = document.getString("exchangePreferences"),
+                        createdAt = document.getLong("createdAt") ?: System.currentTimeMillis(),
+                        status = document.getString("status") ?: "active"
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erreur lors de la conversion du document", e)
+                    null
+                }
             }
         } catch (e: Exception) {
             throw e
@@ -173,22 +210,24 @@ object FirebaseManager {
      */
     suspend fun getProductById(productId: String): Product? {
         return try {
-            val document = produitsCollection.document(productId).get().await()
+            val document = db.collection("products").document(productId).get().await()
             if (document.exists()) {
-                val images = document.get("images") as? List<String> ?: listOf()
                 Product(
                     id = document.id,
-                    title = document.getString("titre") ?: "",
+                    name = document.getString("name") ?: "",
                     description = document.getString("description") ?: "",
-                    price = document.getDouble("prix") ?: 0.0,
-                    images = images,
-                    category = document.getString("categorie") ?: "",
-                    condition = document.getString("etat") ?: "",
-                    location = document.getString("localisation") ?: "",
-                    sellerId = document.getString("vendeurId") ?: "",
-                    sellerName = document.getString("vendeurNom") ?: "",
-                    createdAt = document.getTimestamp("dateCreation")?.toDate()?.time 
-                        ?: System.currentTimeMillis()
+                    price = document.getDouble("price") ?: 0.0,
+                    quantity = document.getLong("quantity")?.toInt() ?: 1,
+                    category = document.getString("category") ?: "",
+                    condition = document.getString("condition") ?: "",
+                    images = (document.get("images") as? List<*>)?.filterIsInstance<String>() ?: listOf(),
+                    sellerId = document.getString("sellerId") ?: "",
+                    sellerName = document.getString("sellerName") ?: "",
+                    sellerPhoto = document.getString("sellerPhoto"),
+                    isAvailableForExchange = document.getBoolean("isAvailableForExchange") ?: false,
+                    exchangePreferences = document.getString("exchangePreferences"),
+                    createdAt = document.getLong("createdAt") ?: System.currentTimeMillis(),
+                    status = document.getString("status") ?: "active"
                 )
             } else {
                 null
@@ -289,21 +328,22 @@ object FirebaseManager {
                                         if (uploadedCount == imageUris.size && !hasError) {
                                             // Créer le document du produit
                                             val productData = hashMapOf(
-                                                "titre" to product.title,
+                                                "name" to product.name,
                                                 "description" to product.description,
-                                                "prix" to product.price,
+                                                "price" to product.price,
                                                 "images" to imageUrls,
-                                                "categorie" to product.category,
-                                                "etat" to product.condition,
-                                                "localisation" to product.location,
-                                                "vendeurId" to (getCurrentUserId() ?: ""),
-                                                "vendeurNom" to (auth.currentUser?.displayName ?: ""),
-                                                "dateCreation" to FieldValue.serverTimestamp(),
-                                                "dateModification" to FieldValue.serverTimestamp()
+                                                "category" to product.category,
+                                                "condition" to product.condition,
+                                                "sellerId" to (getCurrentUserId() ?: ""),
+                                                "sellerName" to (auth.currentUser?.displayName ?: ""),
+                                                "createdAt" to FieldValue.serverTimestamp(),
+                                                "updatedAt" to FieldValue.serverTimestamp(),
+                                                "status" to "available",
+                                                "visibility" to "public"
                                             )
 
                                             // Sauvegarder dans Firestore
-                                            db.collection(PRODUCTS_COLLECTION)
+                                            db.collection("products")
                                                 .document(productId)
                                                 .set(productData)
                                                 .addOnSuccessListener {
@@ -439,7 +479,7 @@ object FirebaseManager {
                         id = doc.id,
                         productId = productId,
                         userId = userId,
-                        productName = product.title,
+                        productName = product.name,
                         productImage = product.images.firstOrNull() ?: "",
                         productPrice = product.price,
                         quantity = quantity,

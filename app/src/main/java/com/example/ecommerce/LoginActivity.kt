@@ -3,6 +3,7 @@ package com.example.ecommerce
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.util.Patterns
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -11,13 +12,13 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
-import android.util.Patterns
-import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var emailEditText: TextInputEditText
@@ -88,7 +89,23 @@ class LoginActivity : AppCompatActivity() {
         }
 
         googleSignInButton.setOnClickListener {
-            startGoogleSignIn()
+            // Vérifier Google Play Services avant de lancer la connexion
+            val googleApiAvailability = GoogleApiAvailability.getInstance()
+            val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
+            
+            if (resultCode == com.google.android.gms.common.ConnectionResult.SUCCESS) {
+                signInWithGoogle()
+            } else {
+                if (googleApiAvailability.isUserResolvableError(resultCode)) {
+                    googleApiAvailability.getErrorDialog(this, resultCode, RC_SIGN_IN)?.show()
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Google Play Services est requis pour la connexion Google",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
 
         signUpTextView.setOnClickListener {
@@ -157,7 +174,7 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun startGoogleSignIn() {
+    private fun signInWithGoogle() {
         try {
             googleSignInButton.isEnabled = false
             val signInIntent = googleSignInClient.signInIntent
@@ -188,8 +205,8 @@ class LoginActivity : AppCompatActivity() {
                 } catch (e: ApiException) {
                     Log.w(TAG, "Google sign in failed", e)
                     val errorMessage = when (e.statusCode) {
-                        GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Connexion Google annulée"
-                        GoogleSignInStatusCodes.NETWORK_ERROR -> "Erreur réseau. Vérifiez votre connexion internet."
+                        CommonStatusCodes.CANCELED -> "Connexion Google annulée"
+                        CommonStatusCodes.NETWORK_ERROR -> "Erreur réseau. Vérifiez votre connexion internet."
                         else -> "Échec de la connexion Google (${e.statusCode})"
                     }
                     showErrorDialog(errorMessage)

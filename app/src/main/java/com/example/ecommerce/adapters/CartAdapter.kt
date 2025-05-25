@@ -17,7 +17,7 @@ class CartAdapter(
         fun bind(cartItem: CartItem) {
             binding.apply {
                 tvProductName.text = cartItem.productName
-                tvProductPrice.text = "$${String.format("%.2f", cartItem.productPrice)}"
+                tvProductPrice.text = String.format("%.2f DT", cartItem.productPrice)
                 tvQuantity.text = cartItem.quantity.toString()
 
                 Glide.with(ivProductImage.context)

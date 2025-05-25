@@ -1,17 +1,17 @@
 package com.example.ecommerce.models
 
 import android.os.Parcelable
+import com.google.firebase.Timestamp
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class Review(
-    var id: String = "",
-    var rating: Double = 0.0,
-    var comment: String = "",
-    var sellerUserId: String = "",
-    var reviewerUserId: String = "",
-    var reviewerName: String = "",
-    var reviewerImageUrl: String? = null,
-    var createdAt: Long = System.currentTimeMillis(),
-    var productId: String? = null
+    val id: String = "",
+    val sellerId: String = "",
+    val buyerId: String = "",
+    val buyerName: String = "",
+    val productId: String = "",
+    val rating: Float = 0f,
+    val comment: String = "",
+    val createdAt: Timestamp = Timestamp.now()
 ) : Parcelable 

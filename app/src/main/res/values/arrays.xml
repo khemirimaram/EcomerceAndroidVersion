@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string-array name="product_categories">
-        <item>Sélectionnez une catégorie</item>
-        <item>Écriture</item>
-        <item>Cahiers et classeurs</item>
-        <item>Sacs et cartables</item>
-        <item>Arts plastiques</item>
-        <item>Électronique</item>
-        <item>Livres scolaires</item>
-        <item>Papeterie</item>
-        <item>Autre</item>
-    </string-array>
-
     <string-array name="product_conditions">
         <item>Sélectionnez l\'état</item>
         <item>Neuf</item>

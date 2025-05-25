@@ -9,10 +9,6 @@
         android:icon="@drawable/ic_favorite"
         android:title="Favoris"/>
     <item
-        android:id="@+id/navigation_add"
-        android:icon="@drawable/ic_add"
-        android:title="Ajouter"/>
-    <item
         android:id="@+id/navigation_messages"
         android:icon="@drawable/ic_message"
         android:title="Messages"/>

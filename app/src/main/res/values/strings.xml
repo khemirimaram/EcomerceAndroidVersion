@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ADEWET</string>
+    <string name="app_id">630229709990</string>
+    <string name="web_client_id">630229709990-qqvf2kkv4n9g2p5vu8rl8g8c7vqk3nrg.apps.googleusercontent.com</string>
     <string name="logo_description">Logo ADEWET</string>
     <string name="title_activity_base">BaseActivity</string>
     <!-- Strings used for fragments for navigation -->
@@ -8,19 +10,121 @@
     <string name="second_fragment_label">Second Fragment</string>
     <string name="next">Next</string>
     <string name="previous">Previous</string>
+    <string name="sign_in">Se connecter</string>
 
     <string name="hello_first_fragment">Hello first fragment</string>
     <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
 
-    <string name="product_image">Product Image</string>
-    <string name="product_location">Product Location</string>
+    <string name="product_image">Image du produit</string>
+    <string name="product_location">Localisation</string>
     <string name="description">Description</string>
-    <string name="add_to_favorites">Add to Favorites</string>
-    <string name="contact_seller">Contact Seller</string>
-    <string name="remove_from_favorites">Remove from Favorites</string>
-    <string name="added_to_favorites">Added to favorites</string>
-    <string name="removed_from_favorites">Removed from favorites</string>
+    <string name="add_to_favorites">Ajouter aux favoris</string>
+    <string name="contact_seller">Contacter le vendeur</string>
+    <string name="remove_from_favorites">Retirer des favoris</string>
+    <string name="added_to_favorites">Ajouté aux favoris</string>
+    <string name="removed_from_favorites">Retiré des favoris</string>
+    <string name="no_products_found">Aucun produit disponible</string>
+    <string name="edit_product">Modifier le produit</string>
+    <string name="chat_feature_coming_soon">La messagerie sera bientôt disponible</string>
+    <string name="edit_feature_coming_soon">La modification sera bientôt disponible</string>
 
     <string name="title_activity_login">LoginActivity</string>
     <string name="title_activity_sign_up">SignUpActivity</string>
+
+    <string name="category_icon">Icône de catégorie</string>
+    
+    <!-- Chat strings -->
+    <string name="message_hint">Écrivez votre message…</string>
+    <string name="send">Envoyer</string>
+    <string name="chat_with">Discussion avec %1$s</string>
+    <string name="error_sending_message">Erreur lors de l\'envoi du message</string>
+    <string name="message_sent">Message envoyé</string>
+    <string name="loading_messages">Chargement des messages…</string>
+    
+    <string-array name="product_categories">
+        <item>Écriture</item>
+        <item>Cahier et Classeur</item>
+        <item>Sacs et Cartable</item>
+        <item>Arts Plastique</item>
+        <item>Électronique</item>
+        <item>Livres Scolaires</item>
+        <item>Papeterie</item>
+    </string-array>
+
+    <string name="rate_seller">Noter le vendeur</string>
+    <string name="comment_optional">Commentaire (optionnel)</string>
+    <string name="submit_rating">Envoyer la note</string>
+    <string name="update_rating">Mettre à jour la note</string>
+    <string name="rating_updated">Note mise à jour</string>
+    <string name="rating_submitted">Note envoyée</string>
+    <string name="please_select_rating">Veuillez sélectionner une note</string>
+    <string name="no_ratings_yet">Pas encore de notes</string>
+    <string name="seller_rating_with_count">%1$.1f étoiles (%2$d avis)</string>
+    <string name="error_submitting_rating">Erreur lors de l\'envoi de la note</string>
+    <string name="error_loading_review_status">Erreur lors du chargement de votre avis</string>
+    <string name="seller">Vendeur</string>
+    <string name="available_for_exchange">Disponible pour échange</string>
+    
+    <!-- Price Format -->
+    <string name="price_format">%1$.2f DT</string>
+
+    <string name="product_details">Détails du produit</string>
+    <string name="leave_review">Laisser un avis</string>
+    <string name="submit">Envoyer</string>
+    <string name="cancel">Annuler</string>
+    <string name="review_submitted">Avis envoyé avec succès</string>
+    <string name="error_submitting_review">Erreur lors de l\'envoi de l\'avis</string>
+    <string name="your_rating">Votre note</string>
+    <string name="your_comment">Votre commentaire</string>
+    <string name="share_experience">Partagez votre expérience avec ce vendeur...</string>
+    <string name="no_reviews_yet">Aucun avis pour le moment</string>
+    <string name="reviews">Avis</string>
+    <string name="seller_info">Informations sur le vendeur</string>
+
+    <!-- Profile Activity -->
+    <string name="profile">Profil</string>
+    <string name="back">Retour</string>
+    <string name="logout">Déconnexion</string>
+    <string name="logout_confirmation">Voulez-vous vraiment vous déconnecter ?</string>
+    <string name="yes">Oui</string>
+    <string name="no">Non</string>
+    <string name="coming_soon">Cette fonctionnalité sera bientôt disponible</string>
+    <string name="login_required">Connexion requise</string>
+    <string name="user_not_found">Utilisateur non trouvé</string>
+    <string name="error_loading_data">Erreur lors du chargement des données</string>
+    <string name="error_loading_profile">Erreur lors du chargement du profil</string>
+    
+    <plurals name="review_count">
+        <item quantity="one">%d avis</item>
+        <item quantity="other">%d avis</item>
+    </plurals>
+    
+    <plurals name="product_count">
+        <item quantity="one">%d produit</item>
+        <item quantity="other">%d produits</item>
+    </plurals>
+
+    <string name="view_profile">View Profile</string>
+
+    <!-- Messages -->
+    <string name="messages">Messages</string>
+    <string name="search_conversations">Rechercher des conversations</string>
+    <string name="no_messages_yet">Pas encore de messages</string>
+    <string name="login_to_message">Veuillez vous connecter pour envoyer un message</string>
+    <string name="cannot_message_yourself">Vous ne pouvez pas vous envoyer un message</string>
+    <string name="error_starting_conversation">Erreur lors du démarrage de la conversation</string>
+
+    <!-- Chat -->
+    <string name="chat">Chat</string>
+    <string name="error_loading_messages">Erreur lors du chargement des messages</string>
+    <string name="error_loading_chat">Erreur lors du chargement du chat</string>
+    <string name="attach_image">Joindre une image</string>
+    <string name="message_image">Image du message</string>
+    <string name="image_sent">Image envoyée</string>
+    <string name="error_uploading_image">Erreur lors de l\'envoi de l\'image</string>
+    <string name="user_is_typing">%s est en train d\'écrire…</string>
+    <string name="search_messages">Rechercher dans les messages</string>
+
+    <string name="profile_image">Image de profil</string>
+    <string name="no_messages">Pas de messages</string>
 </resources>

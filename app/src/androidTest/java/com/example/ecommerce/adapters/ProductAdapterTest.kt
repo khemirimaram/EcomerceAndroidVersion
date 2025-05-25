@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.ecommerce.models.Product
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,10 +33,9 @@ class ProductAdapterTest {
                 price = 99.99,
                 images = listOf("image1.jpg", "image2.jpg"),
                 category = "Electronics",
-                sellerUserId = "seller1",
+                sellerId = "seller1",
                 sellerName = "Seller 1",
-                condition = "New",
-                location = "Paris"
+                condition = "New"
             ),
             Product(
                 id = "2",
@@ -45,25 +44,24 @@ class ProductAdapterTest {
                 price = 149.99,
                 images = listOf("image3.jpg", "image4.jpg"),
                 category = "Electronics",
-                sellerUserId = "seller2",
+                sellerId = "seller2",
                 sellerName = "Seller 2",
-                condition = "Used",
-                location = "Lyon"
+                condition = "Used"
             )
         )
         
         adapter.submitList(products)
         
-        assertThat(adapter.itemCount).isEqualTo(2)
-        assertThat(adapter.currentList).isEqualTo(products)
+        Truth.assertThat(adapter.itemCount).isEqualTo(2)
+        Truth.assertThat(adapter.currentList).isEqualTo(products)
     }
     
     @Test
     fun testEmptyList() {
         adapter.submitList(emptyList())
         
-        assertThat(adapter.itemCount).isEqualTo(0)
-        assertThat(adapter.currentList).isEmpty()
+        Truth.assertThat(adapter.itemCount).isEqualTo(0)
+        Truth.assertThat(adapter.currentList).isEmpty()
     }
     
     @Test
@@ -76,10 +74,9 @@ class ProductAdapterTest {
                 price = 99.99,
                 images = listOf("image1.jpg"),
                 category = "Electronics",
-                sellerUserId = "seller1",
+                sellerId = "seller1",
                 sellerName = "Seller 1",
-                condition = "New",
-                location = "Paris"
+                condition = "New"
             )
         )
         
@@ -91,10 +88,9 @@ class ProductAdapterTest {
                 price = 99.99,
                 images = listOf("image1.jpg"),
                 category = "Electronics",
-                sellerUserId = "seller1",
+                sellerId = "seller1",
                 sellerName = "Seller 1",
-                condition = "New",
-                location = "Paris"
+                condition = "New"
             ),
             Product(
                 id = "2",
@@ -103,17 +99,16 @@ class ProductAdapterTest {
                 price = 149.99,
                 images = listOf("image2.jpg"),
                 category = "Electronics",
-                sellerUserId = "seller2",
+                sellerId = "seller2",
                 sellerName = "Seller 2",
-                condition = "Used",
-                location = "Lyon"
+                condition = "Used"
             )
         )
         
         adapter.submitList(initialProducts)
-        assertThat(adapter.itemCount).isEqualTo(1)
+        Truth.assertThat(adapter.itemCount).isEqualTo(1)
         
         adapter.submitList(updatedProducts)
-        assertThat(adapter.itemCount).isEqualTo(2)
+        Truth.assertThat(adapter.itemCount).isEqualTo(2)
     }
 } 
